@@ -6,5 +6,8 @@ struct iReaderApp: App {
         DocumentGroup(newDocument: { PDFFileDocument() }) { file in
             ContentView(document: file.document)
         }
+        .commands {
+            ViewerCommands()
+        }
     }
 }
