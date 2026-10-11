@@ -13,6 +13,13 @@ struct PDFKitView: NSViewRepresentable {
 
     final class Coordinator {
         var revision: Int?
+        var pageObserver: NSObjectProtocol?
+
+        deinit {
+            if let pageObserver {
+                NotificationCenter.default.removeObserver(pageObserver)
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -25,6 +32,20 @@ struct PDFKitView: NSViewRepresentable {
         view.autoScales = true
         view.document = document.pdf
         viewer.pdfView = view
+
+        // Keep the sidebar in sync with the page being viewed.
+        let viewer = self.viewer
+        context.coordinator.pageObserver = NotificationCenter.default.addObserver(
+            forName: .PDFViewPageChanged, object: view, queue: .main
+        ) { [weak view] _ in
+            let id = view?.currentPage.map(ObjectIdentifier.init)
+            if viewer.currentPageID != id {
+                viewer.currentPageID = id
+            }
+        }
+        DispatchQueue.main.async { [weak view] in
+            viewer.currentPageID = view?.currentPage.map(ObjectIdentifier.init)
+        }
         return view
     }
 

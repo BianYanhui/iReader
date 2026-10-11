@@ -5,6 +5,8 @@ import PDFKit
 final class ViewerState: ObservableObject {
     @Published var tool: AnnotationTool = .select
     @Published var color: AnnotationColor = .yellow
+    /// The page currently shown in the PDF view (kept in sync with scrolling).
+    @Published var currentPageID: ObjectIdentifier?
 
     /// The PDF view of this window (set by `PDFKitView`).
     weak var pdfView: ReaderPDFView?

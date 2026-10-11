@@ -6,22 +6,35 @@ import PDFKit
 struct ThumbnailSidebar: View {
     @ObservedObject var document: PDFFileDocument
     @Binding var selection: Set<ObjectIdentifier>
+    /// The page currently shown in the PDF view.
+    let currentPageID: ObjectIdentifier?
     let onDelete: (Set<ObjectIdentifier>) -> Void
 
     @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         let pages = document.pages
-        List(selection: $selection) {
-            ForEach(Array(pages.enumerated()), id: \.element.pageID) { index, page in
-                ThumbnailRow(page: page, pageNumber: index + 1, revision: document.revision)
+        ScrollViewReader { proxy in
+            List(selection: $selection) {
+                ForEach(Array(pages.enumerated()), id: \.element.pageID) { index, page in
+                    ThumbnailRow(
+                        page: page,
+                        pageNumber: index + 1,
+                        isCurrent: page.pageID == currentPageID,
+                        revision: document.revision
+                    )
                     .tag(page.pageID)
+                    .id(page.pageID)
+                }
+                .onMove { source, destination in
+                    document.movePages(fromOffsets: source, toOffset: destination, undoManager: undoManager)
+                }
             }
-            .onMove { source, destination in
-                document.movePages(fromOffsets: source, toOffset: destination, undoManager: undoManager)
+            .listStyle(.sidebar)
+            .onChange(of: currentPageID) { id in
+                if let id { proxy.scrollTo(id) }
             }
         }
-        .listStyle(.sidebar)
         .onDeleteCommand {
             onDelete(selection)
         }
@@ -49,6 +62,7 @@ extension PDFPage {
 private struct ThumbnailRow: View {
     let page: PDFPage
     let pageNumber: Int
+    let isCurrent: Bool
     let revision: Int
 
     @State private var image: NSImage?
@@ -84,7 +98,8 @@ private struct ThumbnailRow: View {
 
             Text("\(pageNumber)")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .fontWeight(isCurrent ? .bold : .regular)
+                .foregroundColor(isCurrent ? .accentColor : .secondary)
         }
         .padding(.vertical, 4)
         .task(id: RenderKey(page: page.pageID, revision: revision)) {

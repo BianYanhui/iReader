@@ -15,7 +15,12 @@ struct ContentView: View {
                 EmptyDocumentView()
             } else {
                 NavigationSplitView {
-                    ThumbnailSidebar(document: document, selection: $selection, onDelete: deletePages)
+                    ThumbnailSidebar(
+                        document: document,
+                        selection: $selection,
+                        currentPageID: viewer.currentPageID,
+                        onDelete: deletePages
+                    )
                         .navigationSplitViewColumnWidth(min: 140, ideal: 180, max: 320)
                 } detail: {
                     PDFKitView(
