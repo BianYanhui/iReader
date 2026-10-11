@@ -18,7 +18,7 @@ macOS 自带的「预览」删除页面、做简单标注都不够顺手，而�
   - 6 种颜色可选；「标注」菜单 `⌘1`–`⌘5` 快速切换工具
 - **撤销 / 重做**：删除、排序和所有标注操作都可以 `⌘Z` / `⇧⌘Z`
 - **保存 / 另存为**：`⌘S` 保存，`⌥⇧⌘S` 另存为；标注写入为标准 PDF 注释，在「预览」、Acrobat 等阅读器中同样可见
-- **检查更新**：应用菜单或「帮助」里的「检查更新…」；可勾选「自动检查更新」。从 [GitHub Releases](https://github.com/BianYanhui/iReader/releases) 下载最新 `iReader.zip`，替换当前应用并重启（无需第三方更新框架）
+- **检查更新**：应用菜单或「帮助」里的「检查更新…」；可勾选「自动检查更新」。从 [GitHub Releases](https://github.com/BianYanhui/iReader/releases) 下载最新 `iReader.zip` 并重启。若当前是从临时目录运行的，会安装到「应用程序」文件夹（无需第三方更新框架）
 
 系统要求：macOS 13 Ventura 或更高版本（Apple Silicon 与 Intel 通用）。
 
@@ -29,7 +29,7 @@ macOS 自带的「预览」删除页面、做简单标注都不够顺手，而�
 1. 打开本仓库的 [Actions](https://github.com/BianYanhui/iReader/actions/workflows/build.yml) 页面（需要登录 GitHub）
 2. 点击最新一次成功（绿色 ✓）的 **Build** 运行
 3. 在页面底部 **Artifacts** 中下载 **iReader.zip**
-4. 解压得到 `iReader.app`（双击 zip 即可），拖到「应用程序」文件夹
+4. 解压得到 `iReader.app`（双击 zip 即可），**务必拖到「应用程序」文件夹**后再打开（不要直接在下载/临时目录里长期运行，否则系统清理临时文件可能导致崩溃）
 
 ### 从 Releases 下载
 
@@ -117,6 +117,7 @@ iReader/
 - 更新后的应用仍是 ad-hoc 签名：若 Gatekeeper 再次拦截，请用右键「打开」或 `xattr -cr iReader.app`（与首次安装相同）
 - 更新需要能写入当前 `.app` 所在目录（例如「应用程序」文件夹）；在 Xcode 调试产物上更新没有意义
 - 有未保存文档时会拒绝更新；安装日志在 `~/Library/Logs/iReader-update.log`
+- 更新助手会等旧进程完全退出后再替换 `.app`；从 `/var/folders` 等临时路径启动时，新版本会装到 `/Applications`（或 `~/Applications`），避免边跑边删正在用的二进制
 
 ## 许可证
 
