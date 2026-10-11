@@ -421,7 +421,7 @@ final class AppUpdater: ObservableObject {
         alert.informativeText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         alert.alertStyle = .warning
         alert.addButton(withTitle: "好")
-        if case UpdateError.noReleases = error as? UpdateError {
+        if case .noReleases? = error as? UpdateError {
             alert.addButton(withTitle: "打开 Releases 页面")
             if alert.runModal() == .alertSecondButtonReturn {
                 if let url = URL(string: "https://github.com/\(Self.owner)/\(Self.repo)/releases") {
