@@ -149,7 +149,7 @@ extension ViewerState {
 
     /// Saves the target pages (with annotations) as a new PDF and opens it.
     func extractPages(ids: Set<ObjectIdentifier>? = nil) {
-        guard let document else { return }
+        guard document != nil else { return }
         let targets = targetPages(ids)
         guard !targets.isEmpty else { return }
         let output = PDFDocument()
