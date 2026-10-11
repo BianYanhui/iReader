@@ -1,8 +1,10 @@
+import AppKit
 import SwiftUI
 
-/// App menu + Help menu entries for checking updates.
+/// App menu entries for updates, and the Help menu.
 struct UpdateCommands: Commands {
     @ObservedObject var updater: AppUpdater
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
         CommandGroup(after: .appInfo) {
@@ -14,7 +16,17 @@ struct UpdateCommands: Commands {
             Toggle("自动检查更新", isOn: $updater.autoCheckEnabled)
         }
 
-        CommandGroup(after: .help) {
+        CommandGroup(replacing: .help) {
+            Button("键盘快捷键") {
+                openWindow(id: ShortcutsView.windowID)
+            }
+            .keyboardShortcut("/", modifiers: [.command, .shift])
+            Button("iReader 主页") {
+                if let url = URL(string: "https://github.com/BianYanhui/iReader") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            Divider()
             Button("检查更新…") {
                 updater.checkForUpdatesFromMenu()
             }

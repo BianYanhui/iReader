@@ -1,5 +1,6 @@
 import SwiftUI
 import PDFKit
+import UniformTypeIdentifiers
 
 /// Sidebar listing page thumbnails. Supports multi-selection, deleting
 /// (Delete key, context menu) and reordering by drag and drop.
@@ -27,6 +28,10 @@ struct ThumbnailSidebar: View {
                 .onMove { source, destination in
                     document.movePages(fromOffsets: source, toOffset: destination, undoManager: undoManager)
                 }
+                .onInsert(of: [.fileURL]) { index, providers in
+                    // Dropping PDF files between thumbnails inserts their pages.
+                    viewer.insertDroppedPDFs(providers, at: index)
+                }
             }
             .listStyle(.sidebar)
             .onChange(of: viewer.currentPageID) { id in
@@ -38,6 +43,22 @@ struct ThumbnailSidebar: View {
         }
         .contextMenu(forSelectionType: ObjectIdentifier.self) { ids in
             if !ids.isEmpty {
+                Button("向左旋转") { viewer.rotate(by: -90, ids: ids) }
+                Button("向右旋转") { viewer.rotate(by: 90, ids: ids) }
+                Divider()
+                Button(ids.count == 1 ? "复制页面" : "复制 \(ids.count) 个页面") { viewer.duplicatePages(ids: ids) }
+                Button("插入空白页") {
+                    viewer.selection = ids
+                    viewer.insertBlankPage()
+                }
+                Button("从文件插入页面…") {
+                    viewer.selection = ids
+                    viewer.insertPagesFromFile()
+                }
+                Divider()
+                Button("提取为新 PDF…") { viewer.extractPages(ids: ids) }
+                Button("导出为 PNG…") { viewer.exportPagesAsPNG(ids: ids) }
+                Divider()
                 Button(ids.count == 1 ? "删除页面" : "删除 \(ids.count) 个页面", role: .destructive) {
                     onDelete(ids)
                 }
