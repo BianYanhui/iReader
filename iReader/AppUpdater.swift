@@ -249,8 +249,11 @@ final class AppUpdater: ObservableObject {
         }
         let version = (info["CFBundleShortVersionString"] as? String).map(normalizedVersion)
             ?? expectedVersion
-        // Accept equal or newer than the release tag (build may bump patch independently).
-        if isVersion(currentVersion(), newerThan: version) {
+        // Bundle must not be older than the release we asked for, and must be newer than us.
+        if isVersion(expectedVersion, newerThan: version) {
+            throw UpdateError.versionNotNewer(version)
+        }
+        if !isVersion(version, newerThan: currentVersion()) {
             throw UpdateError.versionNotNewer(version)
         }
         let executable = app.appendingPathComponent("Contents/MacOS/iReader")
