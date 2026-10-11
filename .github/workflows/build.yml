@@ -20,7 +20,7 @@ jobs:
     runs-on: macos-15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -53,15 +53,17 @@ jobs:
           ls -lh iReader.zip
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: iReader
+          name: iReader.zip
           path: iReader.zip
+          # Upload the zip as-is so the download is iReader.zip, not a zip in a zip.
+          archive: false
           if-no-files-found: error
 
       - name: Upload build log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: xcodebuild-log
           path: xcodebuild.log

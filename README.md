@@ -27,9 +27,8 @@ macOS 自带的「预览」删除页面、做简单标注都不够顺手，而�
 
 1. 打开本仓库的 [Actions](https://github.com/BianYanhui/iReader/actions/workflows/build.yml) 页面（需要登录 GitHub）
 2. 点击最新一次成功（绿色 ✓）的 **Build** 运行
-3. 在页面底部 **Artifacts** 中下载 **iReader**
-4. 下载得到的 `iReader.zip` 是 GitHub 对构建产物的外层压缩包，解压后里面还有一个 `iReader.zip`，再解压一次即可得到 `iReader.app`
-5. 把 `iReader.app` 拖到「应用程序」文件夹
+3. 在页面底部 **Artifacts** 中下载 **iReader.zip**
+4. 解压得到 `iReader.app`（双击 zip 即可），拖到「应用程序」文件夹
 
 ### 从 Releases 下载
 
