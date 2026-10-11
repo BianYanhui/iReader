@@ -122,11 +122,23 @@ struct ContentView: View {
             .help("放大")
         }
         ToolbarItem {
-            Button(role: .destructive) { deleteSelectedOrCurrentPage() } label: {
-                Label("删除页面", systemImage: "trash")
+            Menu {
+                Button("向左旋转") { viewer.rotate(by: -90) }
+                Button("向右旋转") { viewer.rotate(by: 90) }
+                Divider()
+                Button("插入空白页") { viewer.insertBlankPage() }
+                Button("复制页面") { viewer.duplicatePages() }
+                Button("从文件插入页面…") { viewer.insertPagesFromFile() }
+                Divider()
+                Button("提取为新 PDF…") { viewer.extractPages() }
+                Button("导出为 PNG…") { viewer.exportPagesAsPNG() }
+                Divider()
+                Button("删除页面", role: .destructive) { deleteSelectedOrCurrentPage() }
+                    .disabled(document.pdf.pageCount <= 1)
+            } label: {
+                Label("页面", systemImage: "doc.on.doc")
             }
-            .help("删除侧栏中选中的页面（未选中时删除当前页）")
-            .disabled(document.pdf.pageCount <= 1)
+            .help("页面操作：作用于侧栏选中的页面，未选中时作用于当前页")
         }
         ToolbarItem {
             SearchField(viewer: viewer)

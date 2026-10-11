@@ -24,6 +24,9 @@ final class PDFFileDocument: ReferenceFileDocument {
     /// file stays protected.
     private(set) var password: String?
 
+    /// Source documents of inserted pages (see `retainSource`).
+    private var retainedSources: [PDFDocument] = []
+
     init() {
         pdf = PDFDocument()
     }
@@ -121,6 +124,51 @@ final class PDFFileDocument: ReferenceFileDocument {
             }
             pdf.insert(page, at: min(index, pdf.pageCount))
         }
+    }
+
+    /// Rotates pages by a multiple of 90° (undoable).
+    func rotate(_ targets: [PDFPage], by degrees: Int, undoManager: UndoManager?) {
+        guard !targets.isEmpty, degrees % 90 == 0 else { return }
+        for page in targets {
+            page.rotation = ((page.rotation + degrees) % 360 + 360) % 360
+        }
+        touch(targets)
+        undoManager?.registerUndo(withTarget: self) { [weak undoManager] document in
+            document.rotate(targets, by: -degrees, undoManager: undoManager)
+        }
+        undoManager?.setActionName(degrees > 0 ? "向右旋转" : "向左旋转")
+        revision += 1
+        structureRevision += 1
+    }
+
+    /// Inserts pages (from this or another document) at `index` (undoable).
+    func insert(_ newPages: [PDFPage], at index: Int, actionName: String, undoManager: UndoManager?) {
+        guard !newPages.isEmpty else { return }
+        var list = pages
+        list.insert(contentsOf: newPages, at: max(0, min(index, list.count)))
+        setPages(list, actionName: actionName, undoManager: undoManager)
+    }
+
+    /// Keeps documents whose pages were inserted alive for the lifetime of
+    /// this document (their pages may still reference them).
+    func retainSource(_ source: PDFDocument) {
+        if !retainedSources.contains(where: { $0 === source }) {
+            retainedSources.append(source)
+        }
+    }
+
+    /// A blank page of the given size, backed by a tiny generated PDF.
+    func makeBlankPage(size: CGSize) -> PDFPage? {
+        let data = NSMutableData()
+        guard let consumer = CGDataConsumer(data: data as CFMutableData) else { return nil }
+        var box = CGRect(origin: .zero, size: size)
+        guard let context = CGContext(consumer: consumer, mediaBox: &box, nil) else { return nil }
+        context.beginPDFPage(nil)
+        context.endPDFPage()
+        context.closePDF()
+        guard let source = PDFDocument(data: data as Data), let page = source.page(at: 0) else { return nil }
+        retainSource(source)
+        return page
     }
 
     // MARK: Annotations

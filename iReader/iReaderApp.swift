@@ -19,5 +19,14 @@ struct iReaderApp: App {
             ViewerCommands()
             UpdateCommands(updater: updater)
         }
+
+        Settings {
+            SettingsView()
+        }
+
+        Window("键盘快捷键", id: ShortcutsView.windowID) {
+            ShortcutsView()
+        }
+        .windowResizability(.contentSize)
     }
 }

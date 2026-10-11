@@ -92,6 +92,36 @@ struct ViewerCommands: Commands {
                 .disabled(viewer == nil)
         }
 
+        CommandMenu("页面") {
+            Button("向左旋转") { viewer?.rotate(by: -90) }
+                .keyboardShortcut("l", modifiers: .command)
+                .disabled(viewer == nil)
+            Button("向右旋转") { viewer?.rotate(by: 90) }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(viewer == nil)
+            Divider()
+            Button("插入空白页") { viewer?.insertBlankPage() }
+                .keyboardShortcut("b", modifiers: [.command, .option])
+                .disabled(viewer == nil)
+            Button("复制页面") { viewer?.duplicatePages() }
+                .keyboardShortcut("d", modifiers: [.command, .option])
+                .disabled(viewer == nil)
+            Button("从文件插入页面…") { viewer?.insertPagesFromFile() }
+                .keyboardShortcut("i", modifiers: [.command, .option])
+                .disabled(viewer == nil)
+            Divider()
+            Button("提取为新 PDF…") { viewer?.extractPages() }
+                .keyboardShortcut("e", modifiers: [.command, .option])
+                .disabled(viewer == nil)
+            Button("导出为 PNG…") { viewer?.exportPagesAsPNG() }
+                .keyboardShortcut("e", modifiers: [.command, .option, .shift])
+                .disabled(viewer == nil)
+            Divider()
+            Button("删除页面") { viewer?.deleteTargetPages() }
+                .keyboardShortcut(.delete, modifiers: [.command, .option])
+                .disabled(viewer == nil)
+        }
+
         CommandMenu("标注") {
             ForEach(Array(AnnotationTool.allCases.enumerated()), id: \.element) { index, tool in
                 Button(tool.title) { viewer?.tool = tool }
