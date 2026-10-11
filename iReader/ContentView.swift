@@ -4,20 +4,39 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @ObservedObject var document: PDFFileDocument
+    @Environment(\.undoManager) private var undoManager
     @StateObject private var viewer = ViewerState()
+    @State private var selection = Set<ObjectIdentifier>()
+    @State private var showCannotDeleteAll = false
 
     var body: some View {
         Group {
             if document.pdf.pageCount == 0 {
                 EmptyDocumentView()
             } else {
-                PDFKitView(document: document, viewer: viewer, revision: document.revision)
+                NavigationSplitView {
+                    ThumbnailSidebar(document: document, selection: $selection, onDelete: deletePages)
+                        .navigationSplitViewColumnWidth(min: 140, ideal: 180, max: 320)
+                } detail: {
+                    PDFKitView(document: document, viewer: viewer, revision: document.revision)
+                }
             }
         }
         .frame(minWidth: 700, minHeight: 500)
         .toolbar { toolbarContent }
         .focusedSceneObject(viewer)
         .onDrop(of: [.fileURL], isTargeted: nil, perform: openDroppedFiles)
+        .onChange(of: selection) { ids in
+            // Clicking a single thumbnail scrolls the document to that page.
+            guard ids.count == 1, let id = ids.first,
+                  let page = document.pages.first(where: { $0.pageID == id }) else { return }
+            viewer.go(to: page)
+        }
+        .alert("无法删除全部页面", isPresented: $showCannotDeleteAll) {
+            Button("好") {}
+        } message: {
+            Text("PDF 文档至少需要保留一页。")
+        }
     }
 
     @ToolbarContentBuilder
@@ -36,6 +55,34 @@ struct ContentView: View {
             }
             .help("缩放至适合窗口")
         }
+        ToolbarItem {
+            Button(role: .destructive) { deleteSelectedOrCurrentPage() } label: {
+                Label("删除页面", systemImage: "trash")
+            }
+            .help("删除侧栏中选中的页面（未选中时删除当前页）")
+            .disabled(document.pdf.pageCount <= 1)
+        }
+    }
+
+    private func deleteSelectedOrCurrentPage() {
+        if !selection.isEmpty {
+            deletePages(selection)
+        } else if let page = viewer.currentPage {
+            deletePages([page.pageID])
+        }
+    }
+
+    private func deletePages(_ ids: Set<ObjectIdentifier>) {
+        let indices = IndexSet(document.pages.enumerated().compactMap { offset, page in
+            ids.contains(page.pageID) ? offset : nil
+        })
+        guard !indices.isEmpty else { return }
+        guard indices.count < document.pdf.pageCount else {
+            showCannotDeleteAll = true
+            return
+        }
+        document.deletePages(at: indices, undoManager: undoManager)
+        selection.subtract(ids)
     }
 
     /// Dropping PDF files onto a window opens each of them as a document.
