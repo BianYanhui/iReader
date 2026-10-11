@@ -2,11 +2,24 @@ import AppKit
 import Foundation
 import SwiftUI
 
-/// Checks GitHub Releases for a newer `iReader.zip` and replaces this app in place.
+/// Checks GitHub Releases for a newer `iReader.zip` and installs it safely.
 ///
 /// Sparkle was considered but not used: it needs EdDSA keys, an appcast feed and
 /// extra CI, and the project aims for zero third-party dependencies. Updates are
 /// authenticated by HTTPS to the official repo, plus bundle-ID and version checks.
+///
+/// ## Crash we are carefully avoiding
+/// Replacing or deleting the *running* `.app` while the process is still alive
+/// unmaps the binary vnode. Background SharedFileList / NSXPC callbacks (Open Recent)
+/// then SIGBUS when decoding replies against class metadata in those pages
+/// (`KERN_MEMORY_ERROR` / "backing vnode was force unmounted"). The same crash can
+/// happen if the app was launched from an ephemeral path under `/var/folders` and
+/// that folder is purged (e.g. after sleep). Therefore we:
+/// 1. Never touch the live bundle until the process has fully exited.
+/// 2. Prefer installing into `/Applications` (or `~/Applications`) when the current
+///    bundle lives in a temp / App Translocation location.
+/// 3. Run the installer helper detached (`nohup`) so `exit(0)` cannot kill it.
+/// 4. Quiet document / recent-list activity before quitting.
 @MainActor
 final class AppUpdater: ObservableObject {
     static let shared = AppUpdater()
@@ -80,11 +93,17 @@ final class AppUpdater: ObservableObject {
             }
 
             let notes = release.body?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let message: String
+            var message: String
             if let notes, !notes.isEmpty {
                 message = "当前版本 \(current) → \(release.version)\n\n\(Self.plainText(fromMarkdown: notes))"
             } else {
                 message = "当前版本 \(current)，可更新到 \(release.version)。"
+            }
+
+            let running = Bundle.main.bundleURL
+            let installURL = Self.preferredInstallURL(current: running)
+            if installURL.standardizedFileURL != running.standardizedFileURL {
+                message += "\n\n当前应用位于临时目录，新版本将安装到：\n\(installURL.path)"
             }
 
             let update = presentChoice(
@@ -103,7 +122,7 @@ final class AppUpdater: ObservableObject {
                 return
             }
 
-            try await downloadAndInstall(release)
+            try await downloadAndInstall(release, installURL: installURL, runningURL: running)
         } catch {
             if interactive || !(error is CancellationError) {
                 presentError(error)
@@ -158,14 +177,21 @@ final class AppUpdater: ObservableObject {
 
     // MARK: - Download & install
 
-    private func downloadAndInstall(_ release: ReleaseInfo) async throws {
-        let destination = Bundle.main.bundleURL
-        guard destination.pathExtension == "app" else {
+    private func downloadAndInstall(
+        _ release: ReleaseInfo,
+        installURL: URL,
+        runningURL: URL
+    ) async throws {
+        guard installURL.pathExtension == "app" else {
             throw UpdateError.notInstalled
         }
-        guard FileManager.default.isWritableFile(atPath: destination.path)
-                || FileManager.default.isWritableFile(atPath: destination.deletingLastPathComponent().path) else {
-            throw UpdateError.notWritable(destination.path)
+
+        let installParent = installURL.deletingLastPathComponent()
+        if !FileManager.default.fileExists(atPath: installParent.path) {
+            try FileManager.default.createDirectory(at: installParent, withIntermediateDirectories: true)
+        }
+        guard FileManager.default.isWritableFile(atPath: installParent.path) else {
+            throw UpdateError.notWritable(installURL.path)
         }
 
         showProgress(title: "正在下载 iReader \(release.version)…")
@@ -178,13 +204,13 @@ final class AppUpdater: ObservableObject {
 
         updateProgress(title: "正在安装…", indeterminate: true)
 
+        // Work directory for the zip only. The staged .app is copied out before we
+        // quit; we must never delete or overwrite the *running* bundle here.
         let workDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("iReader-update-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: workDir) }
 
         let zipPath = workDir.appendingPathComponent(Self.assetName)
-        // `download(from:)` may place the file in a location that disappears; move it first.
         if FileManager.default.fileExists(atPath: zipPath.path) {
             try FileManager.default.removeItem(at: zipPath)
         }
@@ -196,22 +222,47 @@ final class AppUpdater: ObservableObject {
 
         let newApp = try Self.findAppBundle(in: unzipDir)
         try Self.validateAppBundle(newApp, expectedVersion: release.version)
-
-        // Clear quarantine on the downloaded bundle before swapping.
         _ = try? Self.run("/usr/bin/xattr", arguments: ["-cr", newApp.path])
 
+        // Stage outside workDir so a future cleanup cannot touch it; the helper
+        // owns this copy after we quit.
+        let staging = FileManager.default.temporaryDirectory
+            .appendingPathComponent("iReader-new-\(UUID().uuidString).app", isDirectory: true)
+        if FileManager.default.fileExists(atPath: staging.path) {
+            try FileManager.default.removeItem(at: staging)
+        }
+        try FileManager.default.copyItem(at: newApp, to: staging)
+        // Zip/workDir are no longer needed; removing them cannot affect the running
+        // bundle (runningURL) or the staging copy.
+        try? FileManager.default.removeItem(at: workDir)
+
         try Self.launchReplacementScript(
-            sourceApp: newApp,
-            destinationApp: destination,
+            sourceApp: staging,
+            installApp: installURL,
+            runningApp: runningURL,
             pid: ProcessInfo.processInfo.processIdentifier
         )
 
-        // Give the script a moment to start watching our PID, then exit.
-        // Use exit(0) instead of terminate so unsaved-document panels cannot
-        // cancel the quit and leave the installer script waiting forever.
-        try await Task.sleep(nanoseconds: 300_000_000)
+        prepareToQuitForUpdate()
+        // Brief pause so the detached helper is definitely scheduled, then exit.
+        // exit(0) skips Swift defer / terminate save panels on purpose.
+        try await Task.sleep(nanoseconds: 400_000_000)
         hideProgress()
         exit(0)
+    }
+
+    /// Close documents and quiet SharedFileList / recent-document activity before
+    /// the binary vnode goes away on quit.
+    private func prepareToQuitForUpdate() {
+        NSDocumentController.shared.clearRecentDocuments(nil)
+        for document in NSDocumentController.shared.documents {
+            document.close()
+        }
+        for window in NSApp.windows {
+            window.orderOut(nil)
+        }
+        // Drop any pending first-responder / tracking state tied to PDFView.
+        NSApp.mainWindow?.makeFirstResponder(nil)
     }
 
     private static func unzip(_ zip: URL, into directory: URL) throws {
@@ -228,7 +279,6 @@ final class AppUpdater: ObservableObject {
         if let direct = contents.first(where: { $0.lastPathComponent == "iReader.app" }) {
             return direct
         }
-        // Nested zip-in-zip or unexpected layout: search one level deeper.
         for item in contents where item.hasDirectoryPath {
             let nested = try FileManager.default.contentsOfDirectory(at: item, includingPropertiesForKeys: nil)
             if let app = nested.first(where: { $0.lastPathComponent == "iReader.app" }) {
@@ -249,7 +299,6 @@ final class AppUpdater: ObservableObject {
         }
         let version = (info["CFBundleShortVersionString"] as? String).map(normalizedVersion)
             ?? expectedVersion
-        // Bundle must not be older than the release we asked for, and must be newer than us.
         if isVersion(expectedVersion, newerThan: version) {
             throw UpdateError.versionNotNewer(version)
         }
@@ -262,41 +311,124 @@ final class AppUpdater: ObservableObject {
         }
     }
 
-    /// Spawns a detached shell script that waits for this process to exit, then
-    /// replaces the .app and relaunches it.
-    private static func launchReplacementScript(sourceApp: URL, destinationApp: URL, pid: Int32) throws {
-        // Keep the new app outside the work dir we delete in defer — copy to a sibling temp.
-        let staging = FileManager.default.temporaryDirectory
-            .appendingPathComponent("iReader-new-\(UUID().uuidString).app", isDirectory: true)
-        if FileManager.default.fileExists(atPath: staging.path) {
-            try FileManager.default.removeItem(at: staging)
-        }
-        try FileManager.default.copyItem(at: sourceApp, to: staging)
+    // MARK: - Install location
 
+    /// True when the bundle is likely to be purged or relocated underfoot
+    /// (temp dirs, App Translocation). Running from such a path matches the
+    /// reported SIGBUS after sleep / update.
+    static func isEphemeralAppLocation(_ url: URL) -> Bool {
+        let path = url.resolvingSymlinksInPath().path
+        if path.contains("/AppTranslocation/") { return true }
+        let prefixes = [
+            "/private/var/folders/",
+            "/var/folders/",
+            "/tmp/",
+            "/private/tmp/",
+            FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path,
+        ]
+        return prefixes.contains { path.hasPrefix($0) }
+    }
+
+    /// Prefer a stable Applications location when the running app is ephemeral.
+    static func preferredInstallURL(current: URL) -> URL {
+        guard isEphemeralAppLocation(current) else { return current }
+
+        let systemApps = URL(fileURLWithPath: "/Applications/iReader.app")
+        if FileManager.default.isWritableFile(atPath: "/Applications") {
+            return systemApps
+        }
+
+        let homeAppsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Applications", isDirectory: true)
+        try? FileManager.default.createDirectory(at: homeAppsDir, withIntermediateDirectories: true)
+        return homeAppsDir.appendingPathComponent("iReader.app", isDirectory: true)
+    }
+
+    /// Spawns a detached helper that waits for this PID to exit, then installs
+    /// the new app (without ever deleting the live bundle beforehand).
+    private static func launchReplacementScript(
+        sourceApp: URL,
+        installApp: URL,
+        runningApp: URL,
+        pid: Int32
+    ) throws {
         let scriptURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("iReader-install-\(UUID().uuidString).sh")
+
+        // Paths embedded below are absolute UUID temp paths — no user-controlled spaces
+        // beyond standard macOS locations; still quote every expansion in the script.
         let script = """
         #!/bin/bash
+        # Detach from the app's process group so exit(0) / SIGHUP cannot kill us.
+        if [ "${IREADER_UPDATER_DETACHED:-}" != "1" ]; then
+          export IREADER_UPDATER_DETACHED=1
+          /usr/bin/nohup /bin/bash "$0" >/dev/null 2>&1 &
+          exit 0
+        fi
+
         set -e
         PID="\(pid)"
-        SRC="\(staging.path)"
-        DST="\(destinationApp.path)"
+        SRC="\(sourceApp.path)"
+        DST="\(installApp.path)"
+        RUNNING="\(runningApp.path)"
         LOG="$HOME/Library/Logs/iReader-update.log"
         mkdir -p "$(dirname "$LOG")"
         exec >>"$LOG" 2>&1
-        echo "$(date) updating iReader (pid=$PID)"
-        while kill -0 "$PID" 2>/dev/null; do sleep 0.2; done
-        sleep 0.4
+        echo "$(date) updater start pid=$PID"
+        echo "SRC=$SRC"
+        echo "DST=$DST"
+        echo "RUNNING=$RUNNING"
+
+        # Wait until the old process is fully gone (not merely a zombie).
+        waited=0
+        while /bin/kill -0 "$PID" 2>/dev/null; do
+          sleep 0.25
+          waited=$((waited + 1))
+          if [ "$waited" -gt 240 ]; then
+            echo "$(date) timeout waiting for pid $PID"
+            exit 1
+          fi
+        done
+        while /bin/ps -p "$PID" -o pid= >/dev/null 2>&1; do
+          sleep 0.25
+        done
+        # Extra settle time for SharedFileList / NSXPC / vnode teardown after exit.
+        sleep 1.5
+
+        if [ ! -d "$SRC" ]; then
+          echo "$(date) missing staged app: $SRC"
+          exit 1
+        fi
+
         /usr/bin/xattr -cr "$SRC" || true
-        /bin/rm -rf "$DST"
-        /usr/bin/ditto "$SRC" "$DST"
-        /usr/bin/codesign --force --deep --sign - "$DST" || true
-        /usr/bin/xattr -cr "$DST" || true
-        /bin/rm -rf "$SRC"
+
+        DST_DIR="$(dirname "$DST")"
+        DST_BASE="$(basename "$DST")"
+        STAGED="$DST_DIR/$DST_BASE.new"
+        BACKUP="$DST_DIR/$DST_BASE.old"
+        /bin/rm -rf "$STAGED" "$BACKUP"
+        /usr/bin/ditto "$SRC" "$STAGED"
+        /usr/bin/codesign --force --deep --sign - "$STAGED" || true
+        /usr/bin/xattr -cr "$STAGED" || true
+
+        # Only now — after the old process has exited — replace the install target.
+        if [ -e "$DST" ]; then
+          /bin/mv "$DST" "$BACKUP"
+        fi
+        /bin/mv "$STAGED" "$DST"
+
         /usr/bin/open "$DST"
+        sleep 0.8
+
+        /bin/rm -rf "$BACKUP" "$SRC"
+        # If we relocated out of a temp bundle, remove it only after the new app opened.
+        if [ "$RUNNING" != "$DST" ] && [ -e "$RUNNING" ]; then
+          /bin/rm -rf "$RUNNING" || true
+        fi
         /bin/rm -f "$0"
-        echo "$(date) done"
+        echo "$(date) updater done"
         """
+
         try script.write(to: scriptURL, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o755],
@@ -309,6 +441,12 @@ final class AppUpdater: ObservableObject {
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try process.run()
+        // First invocation only re-execs under nohup and exits; wait for that so
+        // the detached child exists before we exit(0).
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw UpdateError.helperFailed
+        }
     }
 
     @discardableResult
@@ -384,7 +522,6 @@ final class AppUpdater: ObservableObject {
                 text = regex.stringByReplacingMatches(in: text, range: range, withTemplate: template)
             }
         }
-        // Cap length so the alert stays readable.
         let maxLen = 1200
         if text.count > maxLen {
             let idx = text.index(text.startIndex, offsetBy: maxLen)
@@ -447,7 +584,6 @@ final class AppUpdater: ObservableObject {
         progressIndicator = indicator
         progressAlert = alert
 
-        // Show non-blocking so downloads can proceed on the main actor with awaits.
         let window = alert.window
         window.level = .floating
         alert.layout()
@@ -483,6 +619,7 @@ enum UpdateError: LocalizedError {
     case bundleIDMismatch(String)
     case versionNotNewer(String)
     case unsavedDocuments
+    case helperFailed
 
     var errorDescription: String? {
         switch self {
@@ -510,6 +647,8 @@ enum UpdateError: LocalizedError {
             return "下载到的版本（\(v)）不比当前版本新，已取消安装。"
         case .unsavedDocuments:
             return "有未保存的文档。请先保存或关闭它们，然后再更新。"
+        case .helperFailed:
+            return "无法启动安装脚本。请从 GitHub Releases 手动下载更新。"
         }
     }
 }
