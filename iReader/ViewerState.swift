@@ -7,6 +7,7 @@ import SwiftUI
 enum SidebarMode: String, CaseIterable, Identifiable {
     case thumbnails
     case outline
+    case annotations
     case search
 
     var id: String { rawValue }
@@ -15,6 +16,7 @@ enum SidebarMode: String, CaseIterable, Identifiable {
         switch self {
         case .thumbnails: return "缩略图"
         case .outline: return "目录"
+        case .annotations: return "标注"
         case .search: return "搜索结果"
         }
     }
@@ -23,6 +25,7 @@ enum SidebarMode: String, CaseIterable, Identifiable {
         switch self {
         case .thumbnails: return "square.grid.2x2"
         case .outline: return "list.bullet.indent"
+        case .annotations: return "highlighter"
         case .search: return "magnifyingglass"
         }
     }
@@ -128,6 +131,11 @@ final class ViewerState: ObservableObject {
     func go(to destination: PDFDestination) {
         guard let page = destination.page, document?.contains(page) == true else { return }
         pdfView?.go(to: destination)
+    }
+
+    func go(to annotation: PDFAnnotation, on page: PDFPage) {
+        guard document?.contains(page) == true else { return }
+        pdfView?.go(to: annotation.bounds.insetBy(dx: -40, dy: -40), on: page)
     }
 
     func go(toPageIndex index: Int) {

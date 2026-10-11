@@ -151,6 +151,54 @@ final class PDFFileDocument: ReferenceFileDocument {
         revision += 1
     }
 
+    /// Changes an annotation's color (undoable).
+    func setColor(_ color: NSColor, for annotation: PDFAnnotation, on page: PDFPage, undoManager: UndoManager?) {
+        let oldColor = annotation.color
+        annotation.color = color
+        refresh(annotation, on: page)
+        undoManager?.registerUndo(withTarget: self) { [weak undoManager] document in
+            document.setColor(oldColor, for: annotation, on: page, undoManager: undoManager)
+        }
+        undoManager?.setActionName("更改标注颜色")
+    }
+
+    /// Changes the text of a text box / note (undoable). Text boxes are resized
+    /// to fit, keeping their top-left corner, unless `bounds` is given.
+    func setText(
+        _ text: String,
+        bounds newBounds: NSRect? = nil,
+        for annotation: PDFAnnotation,
+        on page: PDFPage,
+        undoManager: UndoManager?
+    ) {
+        let oldText = annotation.contents ?? ""
+        let oldBounds = annotation.bounds
+        annotation.contents = text
+        if let newBounds {
+            annotation.bounds = newBounds
+        } else if annotation.normalizedType == "freetext" {
+            let topLeft = NSPoint(x: oldBounds.minX, y: oldBounds.maxY)
+            annotation.bounds = ReaderPDFView.textBoxBounds(
+                for: text, font: annotation.font, topLeft: topLeft, page: page
+            )
+        }
+        refresh(annotation, on: page)
+        undoManager?.registerUndo(withTarget: self) { [weak undoManager] document in
+            document.setText(oldText, bounds: oldBounds, for: annotation, on: page, undoManager: undoManager)
+        }
+        undoManager?.setActionName("编辑文字")
+    }
+
+    /// Re-adds an annotation so PDFKit redraws it after a property change.
+    private func refresh(_ annotation: PDFAnnotation, on page: PDFPage) {
+        if page.annotations.contains(where: { $0 === annotation }) {
+            page.removeAnnotation(annotation)
+            page.addAnnotation(annotation)
+        }
+        touch([page])
+        revision += 1
+    }
+
     // MARK: Saving
 
     /// Serializes the document, including all annotations, as PDF data.

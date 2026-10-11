@@ -28,6 +28,8 @@ struct SidebarView: View {
                 ThumbnailSidebar(document: document, viewer: viewer, onDelete: onDelete)
             case .outline:
                 OutlineSidebar(document: document, viewer: viewer)
+            case .annotations:
+                AnnotationListSidebar(document: document, viewer: viewer)
             case .search:
                 SearchResultsSidebar(viewer: viewer)
             }
