@@ -4,24 +4,23 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @ObservedObject var document: PDFFileDocument
+    let fileURL: URL?
+
     @Environment(\.undoManager) private var undoManager
     @StateObject private var viewer = ViewerState()
-    @State private var selection = Set<ObjectIdentifier>()
     @State private var showCannotDeleteAll = false
+    @State private var goToPageText = ""
 
     var body: some View {
         Group {
-            if document.pdf.pageCount == 0 {
+            if document.isLocked {
+                UnlockView(document: document)
+            } else if document.pdf.pageCount == 0 {
                 EmptyDocumentView()
             } else {
                 NavigationSplitView {
-                    ThumbnailSidebar(
-                        document: document,
-                        selection: $selection,
-                        currentPageID: viewer.currentPageID,
-                        onDelete: deletePages
-                    )
-                        .navigationSplitViewColumnWidth(min: 140, ideal: 180, max: 320)
+                    SidebarView(document: document, viewer: viewer, onDelete: deletePages)
+                        .navigationSplitViewColumnWidth(min: 160, ideal: 200, max: 360)
                 } detail: {
                     PDFKitView(
                         document: document,
@@ -34,11 +33,19 @@ struct ContentView: View {
                 }
             }
         }
-        .frame(minWidth: 700, minHeight: 500)
+        .frame(minWidth: 760, minHeight: 500)
         .toolbar { toolbarContent }
         .focusedSceneObject(viewer)
         .onDrop(of: [.fileURL], isTargeted: nil, perform: openDroppedFiles)
-        .onChange(of: selection) { ids in
+        .onAppear {
+            viewer.document = document
+            viewer.undoManager = undoManager
+            viewer.fileURL = fileURL
+        }
+        .onChange(of: fileURL) { url in
+            viewer.fileURL = url
+        }
+        .onChange(of: viewer.selection) { ids in
             // Clicking a single thumbnail scrolls the document to that page.
             guard ids.count == 1, let id = ids.first,
                   let page = document.pages.first(where: { $0.pageID == id }) else { return }
@@ -49,10 +56,25 @@ struct ContentView: View {
         } message: {
             Text("PDF 文档至少需要保留一页。")
         }
+        .alert("前往页面", isPresented: $viewer.showGoToPage) {
+            TextField("页码", text: $goToPageText)
+            Button("前往") {
+                if let number = Int(goToPageText.trimmingCharacters(in: .whitespaces)) {
+                    viewer.go(toPageIndex: number - 1)
+                }
+                goToPageText = ""
+            }
+            Button("取消", role: .cancel) { goToPageText = "" }
+        } message: {
+            Text("输入 1 – \(document.pdf.pageCount) 之间的页码")
+        }
     }
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            PageIndicator(viewer: viewer)
+        }
         ToolbarItem {
             Picker("工具", selection: $viewer.tool) {
                 ForEach(AnnotationTool.allCases) { tool in
@@ -69,6 +91,27 @@ struct ContentView: View {
             ColorSwatchPicker(selection: $viewer.color)
         }
         ToolbarItemGroup {
+            Menu {
+                Button("放大") { viewer.zoomIn() }
+                Button("缩小") { viewer.zoomOut() }
+                Divider()
+                Button("实际大小") { viewer.actualSize() }
+                Button("适合宽度") { viewer.fitWidth() }
+                Button("适合整页") { viewer.fitPage() }
+                Button("自动缩放") { viewer.zoomToFit() }
+                Divider()
+                Picker("页面布局", selection: $viewer.layout) {
+                    ForEach(PageLayout.allCases) { layout in
+                        Text(layout.title).tag(layout)
+                    }
+                }
+                .pickerStyle(.inline)
+                Divider()
+                Toggle("夜间模式", isOn: $viewer.nightMode)
+            } label: {
+                Label("显示", systemImage: "doc.viewfinder")
+            }
+            .help("缩放、页面布局与夜间模式")
             Button { viewer.zoomOut() } label: {
                 Label("缩小", systemImage: "minus.magnifyingglass")
             }
@@ -77,10 +120,6 @@ struct ContentView: View {
                 Label("放大", systemImage: "plus.magnifyingglass")
             }
             .help("放大")
-            Button { viewer.zoomToFit() } label: {
-                Label("适合窗口", systemImage: "arrow.up.left.and.arrow.down.right")
-            }
-            .help("缩放至适合窗口")
         }
         ToolbarItem {
             Button(role: .destructive) { deleteSelectedOrCurrentPage() } label: {
@@ -89,11 +128,14 @@ struct ContentView: View {
             .help("删除侧栏中选中的页面（未选中时删除当前页）")
             .disabled(document.pdf.pageCount <= 1)
         }
+        ToolbarItem {
+            SearchField(viewer: viewer)
+        }
     }
 
     private func deleteSelectedOrCurrentPage() {
-        if !selection.isEmpty {
-            deletePages(selection)
+        if !viewer.selection.isEmpty {
+            deletePages(viewer.selection)
         } else if let page = viewer.currentPage {
             deletePages([page.pageID])
         }
@@ -109,7 +151,7 @@ struct ContentView: View {
             return
         }
         document.deletePages(at: indices, undoManager: undoManager)
-        selection.subtract(ids)
+        viewer.selection.subtract(ids)
     }
 
     /// Dropping PDF files onto a window opens each of them as a document.
@@ -127,6 +169,122 @@ struct ContentView: View {
             }
         }
         return accepted
+    }
+}
+
+/// "12 / 30" in the toolbar; click to jump to a page.
+private struct PageIndicator: View {
+    @ObservedObject var viewer: ViewerState
+
+    var body: some View {
+        Button {
+            viewer.showGoToPage = true
+        } label: {
+            Text(viewer.pageCount > 0 ? "\(viewer.currentPageIndex + 1) / \(viewer.pageCount)" : "–")
+                .monospacedDigit()
+                .frame(minWidth: 64)
+        }
+        .help("前往页面（⌥⌘G）")
+    }
+}
+
+/// Toolbar search field with match counter and previous / next buttons.
+private struct SearchField: View {
+    @ObservedObject var viewer: ViewerState
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("搜索", text: $viewer.searchText)
+                    .textFieldStyle(.plain)
+                    .focused($focused)
+                    .onSubmit { viewer.performSearch() }
+                    .onExitCommand {
+                        viewer.searchText = ""
+                        viewer.clearSearch()
+                    }
+                if !viewer.searchResults.isEmpty {
+                    Text("\((viewer.currentSearchIndex ?? 0) + 1)/\(viewer.searchResults.count)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                if !viewer.searchText.isEmpty {
+                    Button {
+                        viewer.searchText = ""
+                        viewer.clearSearch()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("清除搜索")
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .frame(width: 210)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color(nsColor: .textBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor))
+            )
+
+            Button { viewer.findPrevious() } label: {
+                Image(systemName: "chevron.up")
+            }
+            .help("上一个（⇧⌘G）")
+            .disabled(viewer.searchResults.isEmpty)
+            Button { viewer.findNext() } label: {
+                Image(systemName: "chevron.down")
+            }
+            .help("下一个（⌘G）")
+            .disabled(viewer.searchResults.isEmpty)
+        }
+        .onChange(of: viewer.searchFocusRequest) { _ in
+            focused = true
+        }
+    }
+}
+
+/// Asks for the password of an encrypted PDF.
+private struct UnlockView: View {
+    @ObservedObject var document: PDFFileDocument
+    @State private var password = ""
+    @State private var failed = false
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "lock.doc")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+            Text("此 PDF 受密码保护")
+                .font(.headline)
+            SecureField("密码", text: $password)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 240)
+                .onSubmit(unlock)
+            if failed {
+                Text("密码不正确，请重试。")
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+            Button("解锁", action: unlock)
+                .keyboardShortcut(.defaultAction)
+                .disabled(password.isEmpty)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func unlock() {
+        failed = !document.unlock(with: password)
+        if !failed { password = "" }
     }
 }
 
