@@ -89,6 +89,32 @@ final class PDFFileDocument: ReferenceFileDocument {
         }
     }
 
+    // MARK: Annotations
+
+    func addAnnotations(_ items: [PlacedAnnotation], actionName: String, undoManager: UndoManager?) {
+        guard !items.isEmpty else { return }
+        for item in items {
+            item.page.addAnnotation(item.annotation)
+        }
+        undoManager?.registerUndo(withTarget: self) { [weak undoManager] document in
+            document.removeAnnotations(items, actionName: actionName, undoManager: undoManager)
+        }
+        undoManager?.setActionName(actionName)
+        revision += 1
+    }
+
+    func removeAnnotations(_ items: [PlacedAnnotation], actionName: String, undoManager: UndoManager?) {
+        guard !items.isEmpty else { return }
+        for item in items {
+            item.page.removeAnnotation(item.annotation)
+        }
+        undoManager?.registerUndo(withTarget: self) { [weak undoManager] document in
+            document.addAnnotations(items, actionName: actionName, undoManager: undoManager)
+        }
+        undoManager?.setActionName(actionName)
+        revision += 1
+    }
+
     // MARK: Saving
 
     func snapshot(contentType: UTType) throws -> Data {
@@ -98,4 +124,10 @@ final class PDFFileDocument: ReferenceFileDocument {
     func fileWrapper(snapshot: Data, configuration: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(regularFileWithContents: snapshot)
     }
+}
+
+/// An annotation together with the page it belongs to.
+struct PlacedAnnotation {
+    let annotation: PDFAnnotation
+    let page: PDFPage
 }

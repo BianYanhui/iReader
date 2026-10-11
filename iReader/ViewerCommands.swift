@@ -20,5 +20,13 @@ struct ViewerCommands: Commands {
                 .disabled(viewer == nil)
             Divider()
         }
+
+        CommandMenu("标注") {
+            ForEach(Array(AnnotationTool.allCases.enumerated()), id: \.element) { index, tool in
+                Button(tool.title) { viewer?.tool = tool }
+                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+                    .disabled(viewer == nil)
+            }
+        }
     }
 }

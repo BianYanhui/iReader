@@ -18,7 +18,14 @@ struct ContentView: View {
                     ThumbnailSidebar(document: document, selection: $selection, onDelete: deletePages)
                         .navigationSplitViewColumnWidth(min: 140, ideal: 180, max: 320)
                 } detail: {
-                    PDFKitView(document: document, viewer: viewer, revision: document.revision)
+                    PDFKitView(
+                        document: document,
+                        viewer: viewer,
+                        tool: viewer.tool,
+                        color: viewer.color,
+                        revision: document.revision,
+                        undoManager: undoManager
+                    )
                 }
             }
         }
@@ -41,6 +48,21 @@ struct ContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItem {
+            Picker("工具", selection: $viewer.tool) {
+                ForEach(AnnotationTool.allCases) { tool in
+                    Label(tool.title, systemImage: tool.symbolName)
+                        .help(tool.help)
+                        .tag(tool)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelStyle(.iconOnly)
+            .help("标注工具")
+        }
+        ToolbarItem {
+            ColorSwatchPicker(selection: $viewer.color)
+        }
         ToolbarItemGroup {
             Button { viewer.zoomOut() } label: {
                 Label("缩小", systemImage: "minus.magnifyingglass")

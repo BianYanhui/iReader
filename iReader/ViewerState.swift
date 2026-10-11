@@ -3,6 +3,9 @@ import PDFKit
 
 /// Per-window state shared between the toolbar, menu commands and the PDF view.
 final class ViewerState: ObservableObject {
+    @Published var tool: AnnotationTool = .select
+    @Published var color: AnnotationColor = .yellow
+
     /// The PDF view of this window (set by `PDFKitView`).
     weak var pdfView: ReaderPDFView?
 
