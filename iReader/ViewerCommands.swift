@@ -81,10 +81,10 @@ struct ViewerCommands: Commands {
                 .keyboardShortcut(.upArrow, modifiers: [.command, .option])
                 .disabled(viewer == nil)
             Button("第一页") { viewer?.goToFirstPage() }
-                .keyboardShortcut(.home, modifiers: [])
+                .keyboardShortcut(.upArrow, modifiers: [.command, .option, .shift])
                 .disabled(viewer == nil)
             Button("最后一页") { viewer?.goToLastPage() }
-                .keyboardShortcut(.end, modifiers: [])
+                .keyboardShortcut(.downArrow, modifiers: [.command, .option, .shift])
                 .disabled(viewer == nil)
             Divider()
             Button("前往页面…") { viewer?.showGoToPage = true }
