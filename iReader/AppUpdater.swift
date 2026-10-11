@@ -95,6 +95,14 @@ final class AppUpdater: ObservableObject {
             )
             guard update else { return }
 
+            if NSDocumentController.shared.documents.contains(where: \.isDocumentEdited) {
+                presentInfo(
+                    title: "请先保存",
+                    message: "有未保存的文档。请先保存或关闭它们，然后再更新。"
+                )
+                return
+            }
+
             try await downloadAndInstall(release)
         } catch {
             if interactive || !(error is CancellationError) {
@@ -188,10 +196,6 @@ final class AppUpdater: ObservableObject {
 
         let newApp = try Self.findAppBundle(in: unzipDir)
         try Self.validateAppBundle(newApp, expectedVersion: release.version)
-
-        if NSDocumentController.shared.documents.contains(where: \.isDocumentEdited) {
-            throw UpdateError.unsavedDocuments
-        }
 
         // Clear quarantine on the downloaded bundle before swapping.
         _ = try? Self.run("/usr/bin/xattr", arguments: ["-cr", newApp.path])
