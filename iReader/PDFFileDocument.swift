@@ -15,6 +15,14 @@ final class PDFFileDocument: ReferenceFileDocument {
 
     /// Bumped after every structural or annotation change so views can refresh.
     @Published private(set) var revision = 0
+    /// Bumped only when pages are added, removed, moved or rotated.
+    @Published private(set) var structureRevision = 0
+    /// Per-page change counters, so only edited pages re-render thumbnails.
+    @Published private(set) var pageStamps: [ObjectIdentifier: Int] = [:]
+
+    /// Password used to unlock an encrypted PDF; reused when saving so the
+    /// file stays protected.
+    private(set) var password: String?
 
     init() {
         pdf = PDFDocument()
@@ -25,12 +33,37 @@ final class PDFFileDocument: ReferenceFileDocument {
               let document = PDFDocument(data: data) else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        if document.isLocked {
-            throw CocoaError(.fileReadNoPermission, userInfo: [
-                NSLocalizedDescriptionKey: "iReader 暂不支持打开有密码保护的 PDF。"
-            ])
-        }
+        // Locked (password-protected) documents are opened as-is; the window
+        // asks for the password before showing any content.
         pdf = document
+    }
+
+    var isLocked: Bool { pdf.isLocked }
+
+    /// Tries to unlock an encrypted document. Returns false for a wrong password.
+    func unlock(with password: String) -> Bool {
+        guard pdf.unlock(withPassword: password) else { return false }
+        self.password = password
+        revision += 1
+        structureRevision += 1
+        return true
+    }
+
+    func stamp(for page: PDFPage) -> Int {
+        pageStamps[page.pageID] ?? 0
+    }
+
+    /// Marks pages as changed (thumbnails re-render).
+    func touch(_ pages: [PDFPage]) {
+        for page in pages {
+            pageStamps[page.pageID, default: 0] += 1
+        }
+    }
+
+    /// True when `page` currently belongs to this document.
+    func contains(_ page: PDFPage) -> Bool {
+        let index = pdf.index(for: page)
+        return index >= 0 && index < pdf.pageCount && pdf.page(at: index) === page
     }
 
     // MARK: Pages
@@ -68,6 +101,7 @@ final class PDFFileDocument: ReferenceFileDocument {
         }
         undoManager?.setActionName(actionName)
         revision += 1
+        structureRevision += 1
     }
 
     private func apply(pages newPages: [PDFPage]) {
@@ -96,6 +130,7 @@ final class PDFFileDocument: ReferenceFileDocument {
         for item in items {
             item.page.addAnnotation(item.annotation)
         }
+        touch(items.map(\.page))
         undoManager?.registerUndo(withTarget: self) { [weak undoManager] document in
             document.removeAnnotations(items, actionName: actionName, undoManager: undoManager)
         }
@@ -108,6 +143,7 @@ final class PDFFileDocument: ReferenceFileDocument {
         for item in items {
             item.page.removeAnnotation(item.annotation)
         }
+        touch(items.map(\.page))
         undoManager?.registerUndo(withTarget: self) { [weak undoManager] document in
             document.addAnnotations(items, actionName: actionName, undoManager: undoManager)
         }
@@ -120,12 +156,27 @@ final class PDFFileDocument: ReferenceFileDocument {
     /// Serializes the document, including all annotations, as PDF data.
     /// Used by Save, Save As / Duplicate and autosave.
     func snapshot(contentType: UTType) throws -> Data {
+        guard !pdf.isLocked else {
+            throw CocoaError(.fileWriteNoPermission, userInfo: [
+                NSLocalizedDescriptionKey: "文档尚未解锁，无法保存。"
+            ])
+        }
         guard pdf.pageCount > 0 else {
             throw CocoaError(.fileWriteUnknown, userInfo: [
                 NSLocalizedDescriptionKey: "空文档无法保存。请先打开一个 PDF 文件。"
             ])
         }
-        guard let data = pdf.dataRepresentation() else {
+        let data: Data?
+        if let password, pdf.isEncrypted {
+            // Keep the password protection when writing the file back.
+            data = pdf.dataRepresentation(options: [
+                PDFDocumentWriteOption.userPasswordOption: password,
+                PDFDocumentWriteOption.ownerPasswordOption: password,
+            ])
+        } else {
+            data = pdf.dataRepresentation()
+        }
+        guard let data else {
             throw CocoaError(.fileWriteUnknown, userInfo: [
                 NSLocalizedDescriptionKey: "无法生成 PDF 数据。"
             ])

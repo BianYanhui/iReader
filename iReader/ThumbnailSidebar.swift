@@ -5,9 +5,7 @@ import PDFKit
 /// (Delete key, context menu) and reordering by drag and drop.
 struct ThumbnailSidebar: View {
     @ObservedObject var document: PDFFileDocument
-    @Binding var selection: Set<ObjectIdentifier>
-    /// The page currently shown in the PDF view.
-    let currentPageID: ObjectIdentifier?
+    @ObservedObject var viewer: ViewerState
     let onDelete: (Set<ObjectIdentifier>) -> Void
 
     @Environment(\.undoManager) private var undoManager
@@ -15,13 +13,13 @@ struct ThumbnailSidebar: View {
     var body: some View {
         let pages = document.pages
         ScrollViewReader { proxy in
-            List(selection: $selection) {
+            List(selection: $viewer.selection) {
                 ForEach(Array(pages.enumerated()), id: \.element.pageID) { index, page in
                     ThumbnailRow(
                         page: page,
                         pageNumber: index + 1,
-                        isCurrent: page.pageID == currentPageID,
-                        revision: document.revision
+                        isCurrent: page.pageID == viewer.currentPageID,
+                        stamp: document.stamp(for: page)
                     )
                     .tag(page.pageID)
                     .id(page.pageID)
@@ -31,12 +29,12 @@ struct ThumbnailSidebar: View {
                 }
             }
             .listStyle(.sidebar)
-            .onChange(of: currentPageID) { id in
+            .onChange(of: viewer.currentPageID) { id in
                 if let id { proxy.scrollTo(id) }
             }
         }
         .onDeleteCommand {
-            onDelete(selection)
+            onDelete(viewer.selection)
         }
         .contextMenu(forSelectionType: ObjectIdentifier.self) { ids in
             if !ids.isEmpty {
@@ -59,17 +57,56 @@ extension PDFPage {
     var pageID: ObjectIdentifier { ObjectIdentifier(self) }
 }
 
+/// Small in-memory cache of rendered thumbnails. Entries hold the page weakly
+/// so a recycled object address can never return a stale image.
+final class ThumbnailCache {
+    static let shared = ThumbnailCache()
+
+    private final class Entry {
+        weak var page: PDFPage?
+        let stamp: Int
+        let image: NSImage
+
+        init(page: PDFPage, stamp: Int, image: NSImage) {
+            self.page = page
+            self.stamp = stamp
+            self.image = image
+        }
+    }
+
+    private let cache: NSCache<NSNumber, Entry> = {
+        let cache = NSCache<NSNumber, Entry>()
+        cache.countLimit = 600
+        return cache
+    }()
+
+    private func key(_ page: PDFPage) -> NSNumber {
+        NSNumber(value: UInt(bitPattern: ObjectIdentifier(page).hashValue))
+    }
+
+    func image(for page: PDFPage, stamp: Int) -> NSImage? {
+        guard let entry = cache.object(forKey: key(page)),
+              entry.page === page, entry.stamp == stamp else { return nil }
+        return entry.image
+    }
+
+    func store(_ image: NSImage, for page: PDFPage, stamp: Int) {
+        cache.setObject(Entry(page: page, stamp: stamp, image: image), forKey: key(page))
+    }
+}
+
 private struct ThumbnailRow: View {
     let page: PDFPage
     let pageNumber: Int
     let isCurrent: Bool
-    let revision: Int
+    let stamp: Int
 
     @State private var image: NSImage?
 
     private struct RenderKey: Equatable {
         let page: ObjectIdentifier
-        let revision: Int
+        let stamp: Int
+        let rotation: Int
     }
 
     /// Width / height of the page as displayed (honouring rotation).
@@ -102,8 +139,17 @@ private struct ThumbnailRow: View {
                 .foregroundColor(isCurrent ? .accentColor : .secondary)
         }
         .padding(.vertical, 4)
-        .task(id: RenderKey(page: page.pageID, revision: revision)) {
-            image = page.thumbnail(of: CGSize(width: 240, height: 360), for: .cropBox)
+        .task(id: RenderKey(page: page.pageID, stamp: stamp, rotation: page.rotation)) {
+            if let cached = ThumbnailCache.shared.image(for: page, stamp: stamp &+ page.rotation) {
+                image = cached
+                return
+            }
+            // Let fast scrolling cancel rows that scroll out before rendering.
+            await Task.yield()
+            if Task.isCancelled { return }
+            let rendered = page.thumbnail(of: CGSize(width: 220, height: 320), for: .cropBox)
+            ThumbnailCache.shared.store(rendered, for: page, stamp: stamp &+ page.rotation)
+            image = rendered
         }
     }
 }
