@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Menu bar commands that act on the focused document window.
@@ -5,6 +6,15 @@ struct ViewerCommands: Commands {
     @FocusedObject private var viewer: ViewerState?
 
     var body: some Commands {
+        CommandGroup(after: .saveItem) {
+            // DocumentGroup only shows "Save As…" while Option is held;
+            // offer it explicitly. NSDocument handles it via the responder chain.
+            Button("另存为…") {
+                NSApp.sendAction(#selector(NSDocument.saveAs(_:)), to: nil, from: nil)
+            }
+            .keyboardShortcut("s", modifiers: [.command, .option, .shift])
+        }
+
         CommandGroup(before: .toolbar) {
             Button("放大") { viewer?.zoomIn() }
                 .keyboardShortcut("=", modifiers: .command)

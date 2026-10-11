@@ -117,8 +117,20 @@ final class PDFFileDocument: ReferenceFileDocument {
 
     // MARK: Saving
 
+    /// Serializes the document, including all annotations, as PDF data.
+    /// Used by Save, Save As / Duplicate and autosave.
     func snapshot(contentType: UTType) throws -> Data {
-        throw CocoaError(.featureUnsupported)
+        guard pdf.pageCount > 0 else {
+            throw CocoaError(.fileWriteUnknown, userInfo: [
+                NSLocalizedDescriptionKey: "空文档无法保存。请先打开一个 PDF 文件。"
+            ])
+        }
+        guard let data = pdf.dataRepresentation() else {
+            throw CocoaError(.fileWriteUnknown, userInfo: [
+                NSLocalizedDescriptionKey: "无法生成 PDF 数据。"
+            ])
+        }
+        return data
     }
 
     func fileWrapper(snapshot: Data, configuration: WriteConfiguration) throws -> FileWrapper {
