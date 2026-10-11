@@ -90,6 +90,7 @@ struct PDFKitView: NSViewRepresentable {
         }
 
         viewer.document = document
+        if let undoManager { viewer.undoManager = undoManager }
         if context.coordinator.structureRevision != document.structureRevision {
             if context.coordinator.structureRevision != nil {
                 let viewer = self.viewer
