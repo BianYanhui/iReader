@@ -18,6 +18,7 @@ macOS 自带的「预览」删除页面、做简单标注都不够顺手，而�
   - 6 种颜色可选；「标注」菜单 `⌘1`–`⌘5` 快速切换工具
 - **撤销 / 重做**：删除、排序和所有标注操作都可以 `⌘Z` / `⇧⌘Z`
 - **保存 / 另存为**：`⌘S` 保存，`⌥⇧⌘S` 另存为；标注写入为标准 PDF 注释，在「预览」、Acrobat 等阅读器中同样可见
+- **检查更新**：应用菜单或「帮助」里的「检查更新…」；可勾选「自动检查更新」。从 [GitHub Releases](https://github.com/BianYanhui/iReader/releases) 下载最新 `iReader.zip`，替换当前应用并重启（无需第三方更新框架）
 
 系统要求：macOS 13 Ventura 或更高版本（Apple Silicon 与 Intel 通用）。
 
@@ -32,7 +33,30 @@ macOS 自带的「预览」删除页面、做简单标注都不够顺手，而�
 
 ### 从 Releases 下载
 
-推送 `v*` 标签（如 `v1.0.0`）时，构建好的 `iReader.zip` 会自动附加到 [Releases](https://github.com/BianYanhui/iReader/releases) 页面，解压一次即可。
+推送 `v*` 标签（如 `v1.1.0`）时，构建好的 `iReader.zip` 会自动附加到 [Releases](https://github.com/BianYanhui/iReader/releases) 页面，解压一次即可。应用内「检查更新…」也从这里取最新版。
+
+## 发布新版本（给维护者）
+
+应用通过 **GitHub Releases** 做应用内更新（自建逻辑，不用 Sparkle，因此也不需要付费的 Apple 开发者证书）。流程：
+
+1. 在 `iReader.xcodeproj` 里把 `MARKETING_VERSION`（以及需要时的 `CURRENT_PROJECT_VERSION`）改成新版本号，例如 `1.1.1`，并提交到 `main`
+2. 打并推送标签（必须带 `v` 前缀，且与版本号一致）：
+
+   ```bash
+   git tag v1.1.1
+   git push origin v1.1.1
+   ```
+
+3. GitHub Actions 在 macOS 上构建、ad-hoc 签名，把 `iReader.zip` 挂到该标签对应的 Release 上
+4. 已安装的旧版 iReader 在「检查更新…」或自动检查时会看到新版本，确认后下载 zip、替换 `.app` 并重新打开
+
+**测试更新流程建议：**
+
+1. 先发布一个基准版（例如把当前 `1.1.0` 打成 `v1.1.0`），从 Release 安装
+2. 再把版本升到 `1.1.1`，推送 `v1.1.1`
+3. 打开旧版，选「iReader > 检查更新…」→「立即更新」
+
+版本比较只看 `CFBundleShortVersionString` / 标签名（去掉前缀 `v`），按 major.minor.patch 数值比较。
 
 ## 首次打开（未签名应用）
 
@@ -79,7 +103,9 @@ iReader/
 ├── PDFKitView.swift        # PDFView 封装与标注工具实现
 ├── AnnotationTool.swift    # 工具与颜色
 ├── ViewerState.swift       # 每个窗口的工具 / 缩放状态
-└── ViewerCommands.swift    # 菜单命令
+├── ViewerCommands.swift    # 视图 / 标注菜单命令
+├── AppUpdater.swift        # 基于 GitHub Releases 的应用内更新
+└── UpdateCommands.swift    # 「检查更新…」菜单
 ```
 
 ## 已知限制
@@ -87,6 +113,10 @@ iReader/
 - 暂不支持打开有密码保护的 PDF
 - 标注创建后不能移动或修改颜色（可用橡皮擦删除后重画）
 - 编辑会按 macOS 文档应用的惯例自动保存；如需回到旧版本，可用「文件 > 复原到」
+- **应用内更新**依赖官方仓库的 GitHub Releases（HTTPS + Bundle ID / 版本校验），不做 Sparkle 式的 EdDSA 签名校验；请只从 [BianYanhui/iReader](https://github.com/BianYanhui/iReader) 更新
+- 更新后的应用仍是 ad-hoc 签名：若 Gatekeeper 再次拦截，请用右键「打开」或 `xattr -cr iReader.app`（与首次安装相同）
+- 更新需要能写入当前 `.app` 所在目录（例如「应用程序」文件夹）；在 Xcode 调试产物上更新没有意义
+- 有未保存文档时会拒绝更新；安装日志在 `~/Library/Logs/iReader-update.log`
 
 ## 许可证
 
