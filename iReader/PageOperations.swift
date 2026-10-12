@@ -16,7 +16,7 @@ extension ViewerState {
         return currentPage.map { [$0] } ?? []
     }
 
-    private var insertionIndexAfterTargets: Int {
+    var insertionIndexAfterTargets: Int {
         guard let document else { return 0 }
         let targets = targetPages()
         let indices = targets.map { document.pdf.index(for: $0) }.filter { $0 >= 0 && $0 < document.pdf.pageCount }

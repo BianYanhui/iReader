@@ -129,6 +129,7 @@ struct ContentView: View {
                 Button("插入空白页") { viewer.insertBlankPage() }
                 Button("复制页面") { viewer.duplicatePages() }
                 Button("从文件插入页面…") { viewer.insertPagesFromFile() }
+                Button("合并到当前文档…") { viewer.mergePDFsIntoCurrentDocument() }
                 Divider()
                 Button("提取为新 PDF…") { viewer.extractPages() }
                 Button("导出为 PNG…") { viewer.exportPagesAsPNG() }
