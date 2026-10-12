@@ -22,6 +22,7 @@ struct ShortcutsView: View {
             Item(keys: "⌘S", action: "保存"),
             Item(keys: "⌥⇧⌘S", action: "另存为"),
             Item(keys: "⌘P", action: "打印"),
+            Item(keys: "⌥⇧⌘M", action: "合并 PDF…"),
         ]),
         ShortcutSection(title: "查找与导航", items: [
             Item(keys: "⌘F", action: "搜索（输入后回车）"),
@@ -45,6 +46,8 @@ struct ShortcutsView: View {
             Item(keys: "⌥⌘B", action: "插入空白页"),
             Item(keys: "⌥⌘D", action: "复制页面"),
             Item(keys: "⌥⌘I", action: "从文件插入页面"),
+            Item(keys: "⌥⌘M", action: "合并到当前文档"),
+            Item(keys: "⌥⇧⌘M", action: "合并 PDF（新建文件）"),
             Item(keys: "⌥⌘E", action: "提取为新 PDF"),
             Item(keys: "⌥⇧⌘E", action: "导出为 PNG"),
             Item(keys: "⌫（侧栏）/ ⌥⌘⌫", action: "删除页面"),

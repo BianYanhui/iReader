@@ -13,6 +13,12 @@ struct ViewerCommands: Commands {
                 NSApp.sendAction(#selector(NSDocument.saveAs(_:)), to: nil, from: nil)
             }
             .keyboardShortcut("s", modifiers: [.command, .option, .shift])
+            Divider()
+            Button("合并 PDF…") {
+                PDFMerger.mergeIntoNewDocument()
+            }
+            .keyboardShortcut("m", modifiers: [.command, .option, .shift])
+            .help("选择多个 PDF，调整顺序后保存为一个新文件")
         }
 
         CommandGroup(replacing: .printItem) {
@@ -109,6 +115,10 @@ struct ViewerCommands: Commands {
             Button("从文件插入页面…") { viewer?.insertPagesFromFile() }
                 .keyboardShortcut("i", modifiers: [.command, .option])
                 .disabled(viewer == nil)
+            Button("合并到当前文档…") { viewer?.mergePDFsIntoCurrentDocument() }
+                .keyboardShortcut("m", modifiers: [.command, .option])
+                .disabled(viewer == nil)
+                .help("把其他 PDF 合并进当前文档（可追加或插入，可撤销）")
             Divider()
             Button("提取为新 PDF…") { viewer?.extractPages() }
                 .keyboardShortcut("e", modifiers: [.command, .option])

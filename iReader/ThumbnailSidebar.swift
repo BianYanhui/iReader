@@ -55,6 +55,10 @@ struct ThumbnailSidebar: View {
                     viewer.selection = ids
                     viewer.insertPagesFromFile()
                 }
+                Button("合并到当前文档…") {
+                    viewer.selection = ids
+                    viewer.mergePDFsIntoCurrentDocument()
+                }
                 Divider()
                 Button("提取为新 PDF…") { viewer.extractPages(ids: ids) }
                 Button("导出为 PNG…") { viewer.exportPagesAsPNG(ids: ids) }
