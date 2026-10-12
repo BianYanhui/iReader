@@ -15,7 +15,6 @@ enum PDFMerger {
     }
 
     /// Loads every page of each URL. Password-protected files prompt once.
-    @MainActor
     static func loadPages(from urls: [URL], passwordPromptVerb: String = "合并") -> LoadResult {
         var result = LoadResult()
         for url in urls {
@@ -41,7 +40,6 @@ enum PDFMerger {
         return result
     }
 
-    @MainActor
     private static func unlock(_ source: PDFDocument, name: String, verb: String) -> Bool {
         let alert = NSAlert()
         alert.messageText = "「\(name)」受密码保护"
@@ -58,7 +56,6 @@ enum PDFMerger {
     // MARK: - Merge into a new document (File → 合并 PDF…)
 
     /// Picks several PDFs, lets the user reorder them, writes a new file and opens it.
-    @MainActor
     static func mergeIntoNewDocument() {
         let open = NSOpenPanel()
         open.title = "选择要合并的 PDF"
@@ -130,7 +127,6 @@ enum PDFMerger {
     // MARK: - Order editor
 
     /// Modal window that lets the user reorder the chosen files. Returns nil if cancelled.
-    @MainActor
     static func presentOrderEditor(urls: [URL]) -> [URL]? {
         var result: [URL]?
         let panel = NSPanel(
@@ -207,6 +203,7 @@ enum MergePlacement: String, CaseIterable, Identifiable {
 
 extension ViewerState {
     /// Dedicated merge into the open document: pick files, choose placement, insert (undoable).
+    @MainActor
     func mergePDFsIntoCurrentDocument() {
         guard let document, !document.isLocked else { return }
 
