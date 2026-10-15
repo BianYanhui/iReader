@@ -44,12 +44,14 @@ struct ShortcutsView: View {
         ShortcutSection(title: "页面", items: [
             Item(keys: "⌘L / ⌘R", action: "向左 / 向右旋转"),
             Item(keys: "⌥⌘B", action: "插入空白页"),
-            Item(keys: "⌥⌘D", action: "复制页面"),
+            Item(keys: "⌥⌘D", action: "复制页面（本页副本）"),
+            Item(keys: "⌥⌘C / ⌥⌘V", action: "拷贝 / 粘贴页面（跨文档）"),
             Item(keys: "⌥⌘I", action: "从文件插入页面"),
             Item(keys: "⌥⌘M", action: "合并到当前文档"),
             Item(keys: "⌥⇧⌘M", action: "合并 PDF（新建文件）"),
             Item(keys: "⌥⌘E", action: "提取为新 PDF"),
             Item(keys: "⌥⇧⌘E", action: "导出为 PNG"),
+            Item(keys: "文件 > 导出", action: "PDF / JPEG / 标注 / 目录 / JSON"),
             Item(keys: "⌫（侧栏）/ ⌥⌘⌫", action: "删除页面"),
         ]),
         ShortcutSection(title: "标注", items: [

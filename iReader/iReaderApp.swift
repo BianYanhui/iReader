@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct iReaderApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @ObservedObject private var updater = AppUpdater.shared
 
     init() {
@@ -13,6 +14,9 @@ struct iReaderApp: App {
             ContentView(document: file.document, fileURL: file.fileURL)
                 .onAppear {
                     updater.checkOnLaunchIfNeeded()
+                }
+                .onOpenURL { url in
+                    AIBridge.handle(url)
                 }
         }
         .commands {

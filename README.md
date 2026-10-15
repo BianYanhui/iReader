@@ -39,6 +39,12 @@ macOS 自带的「预览」删除页面、做简单标注都不够顺手，而�
 - **提取所选页面为新 PDF**
 - **导出为 PNG**（144 dpi，包含标注）
 
+**导出与 AI 接口**
+- **文件 > 导出**：导出 PDF（保留标注）、PNG / JPEG（144 dpi）、标注 Markdown / 纯文本、目录、摘要 JSON；有选中页时可只导出选中页
+- **跨文档拷贝页面**：「页面 > 拷贝页面到剪贴板」（`⌥⌘C`）→ 打开另一个 PDF →「粘贴页面」（`⌥⌘V`）；剪贴板存的是 PDF 片段，可撤销
+- **批量转换 Word 为 PDF**：「文件 > 批量转换 Word 为 PDF…」多选 `.doc` / `.docx`，逐个转 PDF，可选合并。优先用系统 Cocoa 导入，失败则尝试 `textutil`、LibreOffice（需自行安装）
+- **给 AI / 脚本用**：注册 `ireader://` URL scheme；可用 `extras/ireader-cli.sh` 触发导出与 Word 转换并读取状态 JSON（见下文）
+
 **其他**
 - 所有页面与标注操作都可撤销 / 重做（`⌘Z` / `⇧⌘Z`）
 - 保存 `⌘S`、另存为 `⌥⇧⌘S`
@@ -65,6 +71,8 @@ macOS 自带的「预览」删除页面、做简单标注都不够顺手，而�
 | 合并到当前文档 / 合并为新文件 | `⌥⌘M` / `⌥⇧⌘M` |
 | 提取为新 PDF / 导出 PNG | `⌥⌘E` / `⌥⇧⌘E` |
 | 删除页面 | 侧栏 `⌫` 或 `⌥⌘⌫` |
+| 拷贝 / 粘贴页面（跨文档） | `⌥⌘C` / `⌥⌘V` |
+| 文件 > 导出 | PDF / PNG / JPEG / 标注 / 目录 / JSON |
 | 打印 / 保存 / 另存为 | `⌘P` / `⌘S` / `⌥⇧⌘S` |
 | 撤销 / 重做 | `⌘Z` / `⇧⌘Z` |
 | 设置 / 快捷键一览 | `⌘,` / `⇧⌘/` |
@@ -83,6 +91,68 @@ macOS 自带的「预览」删除页面、做简单标注都不够顺手，而�
 ### 从 Releases 下载
 
 推送 `v*` 标签（如 `v1.1.0`）时，构建好的 `iReader.zip` 会自动附加到 [Releases](https://github.com/BianYanhui/iReader/releases) 页面，解压一次即可。应用内「检查更新…」也从这里取最新版。
+
+
+## 给 AI / 脚本用
+
+iReader 注册了本地 URL scheme **`ireader://`**（无第三方依赖、无需网络）。其他 Agent 或脚本可用 `open` 触发导出，并通过 **status JSON** 获知结果。
+
+首次使用前请先打开一次 iReader.app，以便系统注册 URL scheme。
+
+### 快速用法（推荐包装脚本）
+
+仓库内 `extras/ireader-cli.sh`：
+
+```bash
+# 导出标注为 Markdown
+./extras/ireader-cli.sh export --path ~/Papers/a.pdf --format md --out /tmp/a.md
+
+# 导出第 1–3 页为 PNG 到目录
+./extras/ireader-cli.sh export --path ~/Papers/a.pdf --format png --pages 1-3 --out /tmp/pages
+
+# Word → PDF（可选 --merge）
+./extras/ireader-cli.sh convert-word --paths "$HOME/a.docx|$HOME/b.docx" --outdir /tmp/pdfs --merge
+
+# 探活
+./extras/ireader-cli.sh ping
+```
+
+脚本会 `open 'ireader://…'`，然后轮询 `--status`（默认写在输出旁的 `.ireader-status.json`），把 JSON 打到 stdout；成功退出码 0。
+
+### URL 参数
+
+| 动作 | 示例 |
+| --- | --- |
+| 导出 | `ireader://export?path=/abs/a.pdf&format=md&out=/abs/a.md&status=/tmp/s.json` |
+| 导出选页图片 | `ireader://export?path=/abs/a.pdf&format=png&pages=1-3,5&out=/abs/dir&status=/tmp/s.json` |
+| Word 转换 | `ireader://convert-word?paths=/abs/a.docx\|/abs/b.docx&outdir=/abs/out&merge=1&status=/tmp/s.json` |
+| 探活 | `ireader://ping?status=/tmp/ping.json` |
+
+**format：** `pdf`（保留 PDF 标注）、`png`、`jpeg`、`md`、`txt`、`outline`、`json`  
+**pages：** 可选，1-based，如 `1-3,5`；省略表示全部  
+**password：** 可选，加密 PDF  
+**png/jpeg 的 out：** 必须是目录；其他格式的 out 是文件路径  
+
+### 状态 JSON 示例
+
+```json
+{
+  "ok": true,
+  "action": "export",
+  "format": "md",
+  "outputs": ["/tmp/a.md"],
+  "error": null,
+  "finishedAt": "2026-10-15T02:00:00Z"
+}
+```
+
+失败时 `ok` 为 `false`，`error` 为中文原因（如未解锁、无标注、路径无效）。
+
+### 限制
+
+- 需要本机已安装 iReader；URL 由系统交给正在运行或新启动的应用
+- Word 转换不依赖 Microsoft Word；复杂排版请安装 [LibreOffice](https://www.libreoffice.org) 以获得更好效果
+- 不会在无用户会话的纯 SSH 环境弹 GUI；请在已登录的 macOS 桌面会话中调用
 
 ## 发布新版本（给维护者）
 
@@ -155,6 +225,11 @@ iReader/
 ├── ReaderPDFView.swift       # PDFView 子类：标注工具、右键菜单
 ├── PageOperations.swift      # 旋转、插入、复制、提取、导出
 ├── PDFMerger.swift           # 合并 PDF（新建 / 并入当前文档）
+├── ExportService.swift        # 导出 PDF/图片/标注/目录（含无 GUI 逻辑）
+├── ExportUI.swift             # 导出面板（文件菜单）
+├── AIBridge.swift             # ireader:// URL scheme + AppDelegate
+├── PageClipboard.swift        # 跨文档页面剪贴板
+├── WordToPDFConverter.swift   # Word → PDF 批量转换
 ├── AnnotationTool.swift      # 工具与颜色
 ├── ViewerState.swift         # 每个窗口的状态：缩放、布局、搜索、阅读位置
 ├── ViewerCommands.swift      # 菜单命令
@@ -169,6 +244,7 @@ iReader/
 
 - 标注创建后不能拖动移动或缩放（可右键改颜色 / 文字，或删除后重画）
 - 夜间模式是整体反色，图片也会被反色
+- Word 转 PDF：优先 Cocoa / textutil；复杂 .doc/.docx 建议安装 LibreOffice。不捆绑 MS Word
 - 搜索为同步执行，超大文档（上千页）搜索时可能短暂卡顿；结果最多列出 1000 条
 - 编辑会按 macOS 文档应用的惯例自动保存；如需回到旧版本，可用「文件 > 复原到」
 - **应用内更新**依赖官方仓库的 GitHub Releases（HTTPS + Bundle ID / 版本校验），不做 Sparkle 式的 EdDSA 签名校验；请只从 [BianYanhui/iReader](https://github.com/BianYanhui/iReader) 更新
