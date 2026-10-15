@@ -19,6 +19,28 @@ struct ViewerCommands: Commands {
             }
             .keyboardShortcut("m", modifiers: [.command, .option, .shift])
             .help("选择多个 PDF，调整顺序后保存为一个新文件")
+            Button("批量转换 Word 为 PDF…") {
+                WordToPDFConverter.runInteractive()
+            }
+            .help("多选 .doc / .docx，转为 PDF（可选合并）")
+            Divider()
+            Menu("导出") {
+                Button("导出 PDF…") { viewer?.exportPDFInteractive() }
+                    .disabled(viewer == nil)
+                Button("导出为 PNG…") { viewer?.exportImagesInteractive(format: .png) }
+                    .disabled(viewer == nil)
+                Button("导出为 JPEG…") { viewer?.exportImagesInteractive(format: .jpeg) }
+                    .disabled(viewer == nil)
+                Divider()
+                Button("导出标注为 Markdown…") { viewer?.exportAnnotationsInteractive(asMarkdown: true) }
+                    .disabled(viewer == nil)
+                Button("导出标注为纯文本…") { viewer?.exportAnnotationsInteractive(asMarkdown: false) }
+                    .disabled(viewer == nil)
+                Button("导出目录…") { viewer?.exportOutlineInteractive() }
+                    .disabled(viewer == nil)
+                Button("导出摘要 JSON…") { viewer?.exportSummaryJSONInteractive() }
+                    .disabled(viewer == nil)
+            }
         }
 
         CommandGroup(replacing: .printItem) {
@@ -109,8 +131,17 @@ struct ViewerCommands: Commands {
             Button("插入空白页") { viewer?.insertBlankPage() }
                 .keyboardShortcut("b", modifiers: [.command, .option])
                 .disabled(viewer == nil)
-            Button("复制页面") { viewer?.duplicatePages() }
+            Button("复制页面（本页副本）") { viewer?.duplicatePages() }
                 .keyboardShortcut("d", modifiers: [.command, .option])
+                .disabled(viewer == nil)
+            Button("拷贝页面到剪贴板") { viewer?.copyPagesToClipboard() }
+                .keyboardShortcut("c", modifiers: [.command, .option])
+                .disabled(viewer == nil)
+                .help("复制选中页到跨文档剪贴板，可在另一个 PDF 窗口粘贴")
+            Button("粘贴页面") { viewer?.pastePagesFromClipboard() }
+                .keyboardShortcut("v", modifiers: [.command, .option])
+                .disabled(viewer == nil)
+            Button("粘贴到末尾") { viewer?.pastePagesFromClipboard(atEnd: true) }
                 .disabled(viewer == nil)
             Button("从文件插入页面…") { viewer?.insertPagesFromFile() }
                 .keyboardShortcut("i", modifiers: [.command, .option])
@@ -123,7 +154,7 @@ struct ViewerCommands: Commands {
             Button("提取为新 PDF…") { viewer?.extractPages() }
                 .keyboardShortcut("e", modifiers: [.command, .option])
                 .disabled(viewer == nil)
-            Button("导出为 PNG…") { viewer?.exportPagesAsPNG() }
+            Button("导出为 PNG…") { viewer?.exportImagesInteractive(format: .png) }
                 .keyboardShortcut("e", modifiers: [.command, .option, .shift])
                 .disabled(viewer == nil)
             Divider()

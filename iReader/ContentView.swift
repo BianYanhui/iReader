@@ -127,12 +127,16 @@ struct ContentView: View {
                 Button("向右旋转") { viewer.rotate(by: 90) }
                 Divider()
                 Button("插入空白页") { viewer.insertBlankPage() }
-                Button("复制页面") { viewer.duplicatePages() }
+                Button("复制页面（本页副本）") { viewer.duplicatePages() }
+                Button("拷贝页面到剪贴板") { viewer.copyPagesToClipboard() }
+                Button("粘贴页面") { viewer.pastePagesFromClipboard() }
                 Button("从文件插入页面…") { viewer.insertPagesFromFile() }
                 Button("合并到当前文档…") { viewer.mergePDFsIntoCurrentDocument() }
                 Divider()
                 Button("提取为新 PDF…") { viewer.extractPages() }
-                Button("导出为 PNG…") { viewer.exportPagesAsPNG() }
+                Button("导出 PDF…") { viewer.exportPDFInteractive() }
+                Button("导出为 PNG…") { viewer.exportImagesInteractive(format: .png) }
+                Button("导出为 JPEG…") { viewer.exportImagesInteractive(format: .jpeg) }
                 Divider()
                 Button("删除页面", role: .destructive) { deleteSelectedOrCurrentPage() }
                     .disabled(document.pdf.pageCount <= 1)

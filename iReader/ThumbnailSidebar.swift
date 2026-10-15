@@ -46,7 +46,9 @@ struct ThumbnailSidebar: View {
                 Button("向左旋转") { viewer.rotate(by: -90, ids: ids) }
                 Button("向右旋转") { viewer.rotate(by: 90, ids: ids) }
                 Divider()
-                Button(ids.count == 1 ? "复制页面" : "复制 \(ids.count) 个页面") { viewer.duplicatePages(ids: ids) }
+                Button(ids.count == 1 ? "复制页面（本页副本）" : "复制 \(ids.count) 个页面（本页副本）") { viewer.duplicatePages(ids: ids) }
+                Button("拷贝页面到剪贴板") { viewer.copyPagesToClipboard(ids: ids) }
+                Button("粘贴页面") { viewer.pastePagesFromClipboard() }
                 Button("插入空白页") {
                     viewer.selection = ids
                     viewer.insertBlankPage()
@@ -61,7 +63,9 @@ struct ThumbnailSidebar: View {
                 }
                 Divider()
                 Button("提取为新 PDF…") { viewer.extractPages(ids: ids) }
-                Button("导出为 PNG…") { viewer.exportPagesAsPNG(ids: ids) }
+                Button("导出 PDF…") { viewer.exportPDFInteractive(ids: ids) }
+                Button("导出为 PNG…") { viewer.exportImagesInteractive(format: .png, ids: ids) }
+                Button("导出为 JPEG…") { viewer.exportImagesInteractive(format: .jpeg, ids: ids) }
                 Divider()
                 Button(ids.count == 1 ? "删除页面" : "删除 \(ids.count) 个页面", role: .destructive) {
                     onDelete(ids)

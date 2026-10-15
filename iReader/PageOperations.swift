@@ -173,47 +173,10 @@ extension ViewerState {
 
     /// Exports the target pages as PNG images (144 dpi, annotations included).
     func exportPagesAsPNG(ids: Set<ObjectIdentifier>? = nil) {
-        guard let document else { return }
-        let targets = targetPages(ids)
-        guard !targets.isEmpty else { return }
-
-        let panel = NSOpenPanel()
-        panel.title = "导出为 PNG — 选择文件夹"
-        panel.prompt = "导出"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.canCreateDirectories = true
-        guard panel.runModal() == .OK, let folder = panel.url else { return }
-
-        var failures = 0
-        for page in targets {
-            let number = document.pdf.index(for: page) + 1
-            let box = page.bounds(for: .cropBox)
-            var size = box.size
-            if page.rotation % 180 != 0 { size = CGSize(width: size.height, height: size.width) }
-            let scale: CGFloat = 2 // 144 dpi
-            let image = page.thumbnail(of: CGSize(width: size.width * scale, height: size.height * scale), for: .cropBox)
-            guard let tiff = image.tiffRepresentation,
-                  let bitmap = NSBitmapImageRep(data: tiff),
-                  let png = bitmap.representation(using: .png, properties: [:]) else {
-                failures += 1
-                continue
-            }
-            let url = folder.appendingPathComponent("\(baseName)-第\(number)页.png")
-            do {
-                try png.write(to: url, options: .atomic)
-            } catch {
-                failures += 1
-            }
-        }
-        if failures > 0 {
-            showError("有 \(failures) 页导出失败。")
-        } else {
-            NSWorkspace.shared.activateFileViewerSelecting([folder])
-        }
+        exportImagesInteractive(format: .png, ids: ids)
     }
 
-    private func showError(_ message: String) {
+    func showError(_ message: String) {
         let alert = NSAlert()
         alert.messageText = message
         alert.alertStyle = .warning

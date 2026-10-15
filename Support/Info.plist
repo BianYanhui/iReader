@@ -30,6 +30,17 @@
 	<string>Copyright © 2026 BianYanhui. MIT License.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.github.bianyanhui.iReader.bridge</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ireader</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
