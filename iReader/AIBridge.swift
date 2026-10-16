@@ -193,6 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async {
                 if let window {
                     WindowTabbing.configureIfDocumentWindow(window)
+                    WindowTabbing.attachNewDocumentWindowIfNeeded(window)
                 }
                 WindowTabbing.configureOpenWindows()
             }
@@ -203,7 +204,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowObservers.append(center.addObserver(
             forName: NSWindow.didBecomeMainNotification, object: nil, queue: .main, using: configure
         ))
-        // NSWindow is created before becoming key; also watch order-front.
     }
 
     func applicationWillTerminate(_ notification: Notification) {
