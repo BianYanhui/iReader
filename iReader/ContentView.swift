@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import PDFKit
 import UniformTypeIdentifiers
 
@@ -44,6 +45,9 @@ struct ContentView: View {
             // Ensure this document window joins the shared tab group.
             DispatchQueue.main.async {
                 WindowTabbing.configureOpenWindows()
+                if let window = NSApp.keyWindow {
+                    WindowTabbing.attachNewDocumentWindowIfNeeded(window)
+                }
             }
         }
         .onChange(of: fileURL) { url in

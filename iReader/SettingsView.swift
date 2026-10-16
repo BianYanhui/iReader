@@ -9,6 +9,9 @@ struct SettingsView: View {
     @AppStorage(Prefs.preferTabsWhenOpening) private var preferTabsWhenOpening = true
     @ObservedObject private var updater = AppUpdater.shared
     @State private var clearedPositions = false
+    @State private var isDefaultPDF = DefaultPDFApp.isDefault
+    @State private var defaultPDFName = DefaultPDFApp.currentDefaultName
+    @State private var defaultPDFMessage: String?
 
     var body: some View {
         Form {
@@ -24,6 +27,9 @@ struct SettingsView: View {
                     .onChange(of: preferTabsWhenOpening) { _ in
                         WindowTabbing.configureOpenWindows()
                     }
+                Text("开启后，新打开的 PDF 会作为标签页加入当前窗口（⌘W 关闭当前标签）。也可在系统设置 › 桌面与程序坞中开启「打开文稿时优先使用标签页」。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 HStack {
                     Button("清除阅读位置记录") {
                         UserDefaults.standard.removeObject(forKey: Prefs.positions)
@@ -32,6 +38,37 @@ struct SettingsView: View {
                     if clearedPositions {
                         Text("已清除").foregroundStyle(.secondary)
                     }
+                }
+            }
+
+            Section("系统") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("默认 PDF 打开方式")
+                        Text(isDefaultPDF ? "当前：iReader" : "当前：\(defaultPDFName)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(isDefaultPDF ? "已是默认" : "设为默认 PDF 打开方式") {
+                        DefaultPDFApp.makeDefault { error in
+                            isDefaultPDF = DefaultPDFApp.isDefault
+                            defaultPDFName = DefaultPDFApp.currentDefaultName
+                            if let error {
+                                defaultPDFMessage = error.localizedDescription
+                            } else if isDefaultPDF {
+                                defaultPDFMessage = "已将 iReader 设为默认 PDF 应用。系统可能还会弹出一次确认。"
+                            } else {
+                                defaultPDFMessage = "已请求设为默认。若未生效，请在「系统设置 › 桌面与程序坞」或访达「显示简介」中确认。"
+                            }
+                        }
+                    }
+                    .disabled(isDefaultPDF)
+                }
+                if let defaultPDFMessage {
+                    Text(defaultPDFMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -59,7 +96,11 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
-        .frame(width: 460)
+        .frame(width: 480)
         .fixedSize(horizontal: false, vertical: true)
+        .onAppear {
+            isDefaultPDF = DefaultPDFApp.isDefault
+            defaultPDFName = DefaultPDFApp.currentDefaultName
+        }
     }
 }
