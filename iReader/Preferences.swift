@@ -7,6 +7,7 @@ enum Prefs {
     static let defaultColor = "pref.defaultColor"
     static let rememberPosition = "pref.rememberPosition"
     static let nightMode = "pref.nightMode"
+    static let preferTabsWhenOpening = "pref.preferTabsWhenOpening"
     static let positions = "pref.positions"
 
     static func registerDefaults() {
@@ -15,6 +16,7 @@ enum Prefs {
             defaultColor: AnnotationColor.yellow.rawValue,
             rememberPosition: true,
             nightMode: false,
+            preferTabsWhenOpening: true,
         ])
     }
 }

@@ -41,6 +41,10 @@ struct ContentView: View {
             viewer.document = document
             viewer.undoManager = undoManager
             viewer.fileURL = fileURL
+            // Ensure this document window joins the shared tab group.
+            DispatchQueue.main.async {
+                WindowTabbing.configureOpenWindows()
+            }
         }
         .onChange(of: fileURL) { url in
             viewer.fileURL = url

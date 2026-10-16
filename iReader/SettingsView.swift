@@ -6,6 +6,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.defaultLayout) private var defaultLayout = PageLayout.singleContinuous.rawValue
     @AppStorage(Prefs.rememberPosition) private var rememberPosition = true
     @AppStorage(Prefs.nightMode) private var nightMode = false
+    @AppStorage(Prefs.preferTabsWhenOpening) private var preferTabsWhenOpening = true
     @ObservedObject private var updater = AppUpdater.shared
     @State private var clearedPositions = false
 
@@ -19,6 +20,10 @@ struct SettingsView: View {
                 }
                 Toggle("新窗口默认使用夜间模式", isOn: $nightMode)
                 Toggle("记住每个文件的阅读位置和缩放", isOn: $rememberPosition)
+                Toggle("打开文件时使用标签页（同一窗口）", isOn: $preferTabsWhenOpening)
+                    .onChange(of: preferTabsWhenOpening) { _ in
+                        WindowTabbing.configureOpenWindows()
+                    }
                 HStack {
                     Button("清除阅读位置记录") {
                         UserDefaults.standard.removeObject(forKey: Prefs.positions)

@@ -7,6 +7,7 @@ struct iReaderApp: App {
 
     init() {
         Prefs.registerDefaults()
+        WindowTabbing.enable()
     }
 
     var body: some Scene {
