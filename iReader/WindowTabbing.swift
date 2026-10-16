@@ -39,7 +39,6 @@ enum WindowTabbing {
     /// shortcut help, panels and alerts.
     static func isDocumentWindow(_ window: NSWindow) -> Bool {
         if window is NSPanel { return false }
-        if window.styleMask.contains(.docModal) { return false }
         if !window.styleMask.contains(.titled) { return false }
 
         let title = window.title
