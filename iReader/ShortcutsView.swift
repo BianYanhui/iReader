@@ -22,6 +22,8 @@ struct ShortcutsView: View {
             Item(keys: "⌘S", action: "保存"),
             Item(keys: "⌥⇧⌘S", action: "另存为"),
             Item(keys: "⌘P", action: "打印"),
+            Item(keys: "⌘W", action: "关闭当前标签（最后一页关闭窗口但不退出）"),
+            Item(keys: "⌘Q", action: "退出 iReader"),
             Item(keys: "⌥⇧⌘M", action: "合并 PDF…"),
         ]),
         ShortcutSection(title: "查找与导航", items: [

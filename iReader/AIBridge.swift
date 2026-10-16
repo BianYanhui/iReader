@@ -178,8 +178,41 @@ enum AIBridge {
     }
 }
 
-/// Routes `ireader://` URLs into `AIBridge`.
+/// App lifecycle: `ireader://` URLs, document window tabbing, and “last window
+/// does not quit the app”.
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var windowObservers: [NSObjectProtocol] = []
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        WindowTabbing.enable()
+        WindowTabbing.configureOpenWindows()
+
+        let center = NotificationCenter.default
+        let configure: (Notification) -> Void = { note in
+            let window = note.object as? NSWindow
+            DispatchQueue.main.async {
+                if let window {
+                    WindowTabbing.configureIfDocumentWindow(window)
+                }
+                WindowTabbing.configureOpenWindows()
+            }
+        }
+        windowObservers.append(center.addObserver(
+            forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main, using: configure
+        ))
+        windowObservers.append(center.addObserver(
+            forName: NSWindow.didBecomeMainNotification, object: nil, queue: .main, using: configure
+        ))
+        // NSWindow is created before becoming key; also watch order-front.
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        for observer in windowObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        windowObservers.removeAll()
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             Task { @MainActor in
@@ -188,7 +221,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        // Cold-start with a URL is delivered via application(_:open:).
+    /// Closing the last PDF tab/window must not quit iReader (⌘Q still quits).
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
+    /// Clicking the Dock icon with no open windows brings back an empty document
+    /// window so the user can Open again without relaunching.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            do {
+                _ = try NSDocumentController.shared.openUntitledDocumentAndDisplay(true)
+            } catch {
+                NSDocumentController.shared.openDocument(nil)
+            }
+        }
+        return true
     }
 }
