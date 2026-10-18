@@ -37,6 +37,7 @@ struct ContentView: View {
         .frame(minWidth: 760, minHeight: 500)
         .toolbar { toolbarContent }
         .focusedSceneObject(viewer)
+        .focusedObject(viewer)
         .onDrop(of: [.fileURL], isTargeted: nil, perform: openDroppedFiles)
         .onAppear {
             viewer.document = document
@@ -273,7 +274,11 @@ private struct SearchField: View {
             .disabled(viewer.searchResults.isEmpty)
         }
         .onChange(of: viewer.searchFocusRequest) { _ in
+            // Toolbar TextFields often ignore the first focus flip; retry next runloop.
             focused = true
+            DispatchQueue.main.async {
+                focused = true
+            }
         }
     }
 }

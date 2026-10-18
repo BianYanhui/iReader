@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Menu bar commands that act on the focused document window.
 struct ViewerCommands: Commands {
-    @FocusedObject private var viewer: ViewerState?
+    @FocusedSceneObject private var viewer: ViewerState?
 
     var body: some Commands {
         CommandGroup(after: .saveItem) {
@@ -49,7 +49,9 @@ struct ViewerCommands: Commands {
                 .disabled(viewer == nil)
         }
 
-        CommandGroup(replacing: .textEditing) {
+        // Must use .textFinding (not .textEditing) so Cut/Copy/Paste stay intact,
+        // and @FocusedSceneObject to match ContentView.focusedSceneObject.
+        CommandGroup(replacing: .textFinding) {
             Button("查找…") { viewer?.requestSearchFocus() }
                 .keyboardShortcut("f", modifiers: .command)
                 .disabled(viewer == nil)
