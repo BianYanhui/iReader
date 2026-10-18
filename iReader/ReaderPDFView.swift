@@ -43,27 +43,13 @@ final class ReaderPDFView: PDFView {
 
     // MARK: Find (⌘F)
 
-    /// PDFKit's default Find panel steals ⌘F; send it to iReader's toolbar search instead.
-    override func performFindPanelAction(_ sender: Any?) {
-        if let onFindShortcut {
-            onFindShortcut()
-            return
-        }
-        super.performFindPanelAction(sender)
-    }
-
+    /// Intercept ⌘F while the PDF view is first responder and route to toolbar search.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if flags == .command,
            event.charactersIgnoringModifiers?.lowercased() == "f" {
             onFindShortcut?()
             return true
-        }
-        if flags == .command,
-           event.charactersIgnoringModifiers?.lowercased() == "g" {
-            // Let the menu / commands handle next/previous via responder if possible;
-            // fall through to super so we don't break other ⌘G handlers unexpectedly.
-            return super.performKeyEquivalent(with: event)
         }
         return super.performKeyEquivalent(with: event)
     }

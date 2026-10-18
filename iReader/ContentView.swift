@@ -38,6 +38,10 @@ struct ContentView: View {
         .toolbar { toolbarContent }
         .focusedSceneObject(viewer)
         .focusedObject(viewer)
+        .onReceive(NotificationCenter.default.publisher(for: .iReaderFocusSearch)) { _ in
+            guard let window = viewer.pdfView?.window, window.isKeyWindow else { return }
+            viewer.requestSearchFocus()
+        }
         .onDrop(of: [.fileURL], isTargeted: nil, perform: openDroppedFiles)
         .onAppear {
             viewer.document = document
