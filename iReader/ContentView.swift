@@ -37,6 +37,11 @@ struct ContentView: View {
         .frame(minWidth: 760, minHeight: 500)
         .toolbar { toolbarContent }
         .focusedSceneObject(viewer)
+        .focusedObject(viewer)
+        .onReceive(NotificationCenter.default.publisher(for: .iReaderFocusSearch)) { _ in
+            guard let window = viewer.pdfView?.window, window.isKeyWindow else { return }
+            viewer.requestSearchFocus()
+        }
         .onDrop(of: [.fileURL], isTargeted: nil, perform: openDroppedFiles)
         .onAppear {
             viewer.document = document
@@ -273,7 +278,11 @@ private struct SearchField: View {
             .disabled(viewer.searchResults.isEmpty)
         }
         .onChange(of: viewer.searchFocusRequest) { _ in
+            // Toolbar TextFields often ignore the first focus flip; retry next runloop.
             focused = true
+            DispatchQueue.main.async {
+                focused = true
+            }
         }
     }
 }

@@ -35,6 +35,10 @@ struct PDFKitView: NSViewRepresentable {
         viewer.pdfView = view
         viewer.document = document
         viewer.applyViewOptions()
+        let viewerState = self.viewer
+        view.onFindShortcut = { [weak viewerState] in
+            viewerState?.requestSearchFocus()
+        }
 
         // Keep the sidebar / position store in sync with the page being viewed.
         let viewer = self.viewer
@@ -64,6 +68,7 @@ struct PDFKitView: NSViewRepresentable {
         view.onRemoveAnnotations = nil
         view.onSetColor = nil
         view.onSetText = nil
+        view.onFindShortcut = nil
     }
 
     func updateNSView(_ view: ReaderPDFView, context: Context) {
@@ -71,6 +76,10 @@ struct PDFKitView: NSViewRepresentable {
             view.document = document.pdf
         }
         viewer.pdfView = view
+        let viewerState = self.viewer
+        view.onFindShortcut = { [weak viewerState] in
+            viewerState?.requestSearchFocus()
+        }
         view.tool = tool
         view.annotationColor = color.nsColor
 

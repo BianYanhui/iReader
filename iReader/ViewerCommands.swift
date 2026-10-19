@@ -49,10 +49,17 @@ struct ViewerCommands: Commands {
                 .disabled(viewer == nil)
         }
 
-        CommandGroup(replacing: .textEditing) {
-            Button("查找…") { viewer?.requestSearchFocus() }
-                .keyboardShortcut("f", modifiers: .command)
-                .disabled(viewer == nil)
+        // Append after text editing so Cut/Copy/Paste stay intact.
+        // ContentView publishes .focusedObject(viewer) so this FocusedObject resolves.
+        CommandGroup(after: .textEditing) {
+            Button("查找…") {
+                if let viewer {
+                    viewer.requestSearchFocus()
+                } else {
+                    NotificationCenter.default.post(name: .iReaderFocusSearch, object: nil)
+                }
+            }
+            .keyboardShortcut("f", modifiers: .command)
             Button("查找下一个") { viewer?.findNext() }
                 .keyboardShortcut("g", modifiers: .command)
                 .disabled(viewer == nil)

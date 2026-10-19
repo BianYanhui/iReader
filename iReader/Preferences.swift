@@ -89,3 +89,9 @@ enum PositionStore {
         UserDefaults.standard.set(all, forKey: Prefs.positions)
     }
 }
+
+extension Notification.Name {
+    /// Posted when Find (⌘F) should focus the toolbar search field of the key window.
+    static let iReaderFocusSearch = Notification.Name("iReader.focusSearch")
+}
+

@@ -31,12 +31,28 @@ final class ReaderPDFView: PDFView {
     var onSetColor: ((PDFAnnotation, PDFPage, NSColor) -> Void)?
     var onSetText: ((PDFAnnotation, PDFPage, String) -> Void)?
 
+    /// Called when the system Find action (⌘F) hits this view; route to toolbar search.
+    var onFindShortcut: (() -> Void)?
+
     // In-progress ink stroke or shape.
     private var drawPage: PDFPage?
     private var inkPath: NSBezierPath?
     private var shapeStart: NSPoint?
     private var shapeEnd: NSPoint?
     private var preview: PDFAnnotation?
+
+    // MARK: Find (⌘F)
+
+    /// Intercept ⌘F while the PDF view is first responder and route to toolbar search.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if flags == .command,
+           event.charactersIgnoringModifiers?.lowercased() == "f" {
+            onFindShortcut?()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
 
     // MARK: Mouse handling
 
