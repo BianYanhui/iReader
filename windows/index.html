@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>iReader</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <div id="app">
+      <header class="toolbar">
+        <button id="btn-open" title="打开 PDF">打开</button>
+        <button id="btn-save" title="保存" disabled>保存</button>
+        <button id="btn-save-as" title="另存为" disabled>另存为</button>
+        <span class="sep"></span>
+        <button id="btn-prev" title="上一页" disabled>‹</button>
+        <span id="page-label" class="page-label">–</span>
+        <button id="btn-next" title="下一页" disabled>›</button>
+        <span class="sep"></span>
+        <button id="btn-zoom-out" disabled>−</button>
+        <button id="btn-zoom-in" disabled>+</button>
+        <button id="btn-fit" disabled>适合宽度</button>
+        <span class="sep"></span>
+        <input id="search-input" type="search" placeholder="搜索 (Ctrl+F)" disabled />
+        <button id="btn-search" disabled>查找</button>
+        <button id="btn-search-prev" disabled>上一个</button>
+        <button id="btn-search-next" disabled>下一个</button>
+        <span class="sep"></span>
+        <button id="btn-delete-page" title="删除当前页" disabled>删页</button>
+        <button id="btn-rotate" title="向右旋转 90°" disabled>旋转</button>
+        <span id="status" class="status"></span>
+      </header>
+      <div class="main">
+        <aside id="thumbs" class="thumbs" aria-label="缩略图"></aside>
+        <section id="viewer" class="viewer">
+          <div id="empty" class="empty">
+            <h1>iReader</h1>
+            <p>打开 PDF 开始阅读与编辑页面</p>
+            <p class="hint">支持打开、翻页、搜索、删除 / 旋转页面、保存</p>
+            <button id="btn-open-empty">打开 PDF…</button>
+          </div>
+          <div id="pages" class="pages" hidden></div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>

@@ -4,6 +4,10 @@
 
 macOS 自带的「预览」删除页面、做简单标注都不够顺手，而现有的 PDF 工具又太重。iReader 只做最常用的几件事，并尽量做到顺手。
 
+## Windows 版
+
+同仓库 [`windows/`](windows/) 目录提供 **Windows** 构建（Tauri）。从 [Releases](https://github.com/BianYanhui/iReader/releases) 下载 `iReader-windows-setup.exe` / `iReader-windows.msi` / 便携 `iReader-windows-portable.zip`。当前 Windows 为功能子集（打开、翻页、搜索、删页/旋转、保存），macOS 版功能更全。
+
 ## 功能
 
 **阅读与导航**
