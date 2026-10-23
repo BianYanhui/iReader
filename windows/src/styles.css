@@ -64,3 +64,7 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 }
 .page-wrap canvas { display: block; max-width: 100%; }
 .mark { background: rgba(250, 204, 21, 0.45); }
+
+.page-wrap canvas, .thumb canvas {
+  image-rendering: auto;
+}

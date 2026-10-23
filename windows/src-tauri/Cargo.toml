@@ -1,6 +1,6 @@
 [package]
 name = "ireader-windows"
-version = "0.1.0"
+version = "0.1.1"
 description = "iReader for Windows"
 authors = ["BianYanhui"]
 edition = "2021"

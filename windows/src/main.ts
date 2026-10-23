@@ -118,7 +118,12 @@ async function loadFromOpened(file: OpenedFile) {
 
 async function refreshTitle() {
   const mark = dirty ? " •" : "";
-  await getCurrentWindow().setTitle(`${fileName}${mark} — iReader`);
+  try {
+    await getCurrentWindow().setTitle(`${fileName}${mark} — iReader`);
+  } catch {
+    // Title permission may be missing on older builds; never block opening.
+    document.title = `${fileName}${mark} — iReader`;
+  }
 }
 
 async function reloadPdfjs() {
@@ -157,28 +162,34 @@ async function renderAll() {
     if (token !== renderToken) return;
     const page = await pdfDoc.getPage(i);
     const s = await pageScale(page);
+    const dpr = window.devicePixelRatio || 1;
     const viewport = page.getViewport({ scale: s });
     const wrap = document.createElement("div");
     wrap.className = "page-wrap";
     wrap.dataset.page = String(i);
     wrap.id = `page-${i}`;
     const canvas = document.createElement("canvas");
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
+    canvas.width = Math.floor(viewport.width * dpr);
+    canvas.height = Math.floor(viewport.height * dpr);
+    canvas.style.width = `${Math.floor(viewport.width)}px`;
+    canvas.style.height = `${Math.floor(viewport.height)}px`;
     wrap.appendChild(canvas);
     ui.pages.appendChild(wrap);
     const ctx = canvas.getContext("2d")!;
-    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+    const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined;
+    await page.render({ canvasContext: ctx, viewport, transform, canvas }).promise;
 
-    // thumbnail
+    // thumbnail (also crisp on HiDPI)
     const thumbScale = 0.2;
     const tv = page.getViewport({ scale: thumbScale });
     const t = document.createElement("div");
     t.className = "thumb" + (i === currentPage ? " active" : "");
     t.dataset.page = String(i);
     const tc = document.createElement("canvas");
-    tc.width = tv.width;
-    tc.height = tv.height;
+    tc.width = Math.floor(tv.width * dpr);
+    tc.height = Math.floor(tv.height * dpr);
+    tc.style.width = `${Math.floor(tv.width)}px`;
+    tc.style.height = `${Math.floor(tv.height)}px`;
     const label = document.createElement("div");
     label.className = "n";
     label.textContent = String(i);
@@ -186,9 +197,12 @@ async function renderAll() {
     t.appendChild(label);
     t.addEventListener("click", () => goToPage(i));
     ui.thumbs.appendChild(t);
+    const tctx = tc.getContext("2d")!;
+    const tTransform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined;
     await page.render({
-      canvasContext: tc.getContext("2d")!,
+      canvasContext: tctx,
       viewport: tv,
+      transform: tTransform,
       canvas: tc,
     }).promise;
   }
