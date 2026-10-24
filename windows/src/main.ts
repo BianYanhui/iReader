@@ -31,6 +31,7 @@ const ui = {
   searchNext: $<HTMLButtonElement>("btn-search-next"),
   deletePage: $<HTMLButtonElement>("btn-delete-page"),
   rotate: $<HTMLButtonElement>("btn-rotate"),
+  update: $<HTMLButtonElement>("btn-update"),
   status: $<HTMLSpanElement>("status"),
   empty: $<HTMLDivElement>("empty"),
   pages: $<HTMLDivElement>("pages"),
@@ -433,5 +434,71 @@ void listen<string>("open-path", (ev) => {
   void openPath(ev.payload);
 });
 
+
+type UpdateInfo = {
+  currentVersion: string;
+  latestVersion: string;
+  tagName: string;
+  notes: string;
+  updateAvailable: boolean;
+  assetName: string;
+  downloadUrl: string;
+};
+
+async function checkUpdates(interactive: boolean) {
+  try {
+    ui.update.disabled = true;
+    setStatus("正在检查更新…");
+    const info = await invoke<UpdateInfo>("check_for_updates");
+    if (!info.updateAvailable) {
+      setStatus(interactive ? `已是最新（${info.currentVersion}）` : `v${info.currentVersion}`);
+      return;
+    }
+    const ok = confirm(
+      `发现新版本 ${info.latestVersion}（当前 ${info.currentVersion}）\n\n更新将退出并重新打开 iReader，请先保存未保存的 PDF。\n\n立即更新？`,
+    );
+    if (!ok) {
+      setStatus(`可更新到 ${info.latestVersion}`);
+      return;
+    }
+    if (dirty && !confirm("有未保存的更改，仍要更新吗？未保存内容会丢失。")) {
+      setStatus("已取消更新");
+      return;
+    }
+    setStatus(`正在下载 ${info.latestVersion}…`);
+    await invoke("apply_update", {
+      downloadUrl: info.downloadUrl,
+      assetName: info.assetName,
+    });
+    setStatus("即将退出并完成更新…");
+    await invoke("quit_app");
+  } catch (e) {
+    setStatus(`更新失败：${e}`);
+    if (interactive) alert(`更新失败：${e}`);
+  } finally {
+    ui.update.disabled = false;
+  }
+}
+
+ui.update.addEventListener("click", () => void checkUpdates(true));
+
+// Silent launch check at most once per day.
+void (async () => {
+  try {
+    const ver = await invoke<string>("get_app_version");
+    setStatus(`v${ver}`);
+    const key = "iReader.lastWinUpdateCheck";
+    const last = Number(localStorage.getItem(key) || "0");
+    if (Date.now() - last < 24 * 60 * 60 * 1000) return;
+    localStorage.setItem(key, String(Date.now()));
+    const info = await invoke<UpdateInfo>("check_for_updates");
+    if (info.updateAvailable) {
+      setStatus(`有新版本 ${info.latestVersion}，点「检查更新」`);
+    }
+  } catch {
+    /* offline / no release yet */
+  }
+})();
+
 setEnabled(false);
-setStatus("准备就绪");
+
