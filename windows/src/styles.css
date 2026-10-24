@@ -52,6 +52,12 @@ body { background: var(--bg); color: var(--text); overflow: hidden; }
 .thumb canvas { width: 100%; height: auto; display: block; border-radius: 2px; }
 .thumb .n { font-size: 11px; color: var(--muted); margin-top: 4px; }
 .viewer { flex: 1; overflow: auto; position: relative; }
+/* Author `display` must not override the HTML hidden attribute. */
+.empty[hidden],
+.pages[hidden] {
+  display: none !important;
+}
+
 .empty {
   height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 8px; color: var(--muted);
