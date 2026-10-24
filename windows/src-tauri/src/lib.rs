@@ -1,3 +1,5 @@
+mod updater;
+
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use serde::Serialize;
 use std::fs;
@@ -40,6 +42,11 @@ fn write_pdf(path: String, data_base64: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
 fn pick_open_pdf(app: tauri::AppHandle) -> Result<Option<OpenedFile>, String> {
     let path = app
         .dialog()
@@ -79,7 +86,11 @@ pub fn run() {
             read_pdf,
             write_pdf,
             pick_open_pdf,
-            pick_save_pdf
+            pick_save_pdf,
+            updater::get_app_version,
+            updater::check_for_updates,
+            updater::apply_update,
+            quit_app
         ])
         .setup(|app| {
             if let Some(path) = std::env::args().nth(1) {
