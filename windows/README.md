@@ -2,7 +2,7 @@
 
 Windows 版 iReader（Tauri 2 + pdf.js + pdf-lib）。
 
-## 功能（1.5.1）
+## 功能（1.5.2）
 
 - 打开 / 保存 / 另存为 PDF
 - 连续翻页、缩略图、适合宽度缩放
